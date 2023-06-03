@@ -1,5 +1,10 @@
 type ENV = {
     UPWORK_LINK: string;
+    TELEGRAM_BOT_TOKEN: string;
+    TELEGRAM_GROUP_ID: string;
+    BOT_OWNER_ID: string;
+    BOT_USERNAME: string;
+    BOT_NAME: string;
 };
 
 declare const env: ENV;

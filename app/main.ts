@@ -14,7 +14,7 @@ import './init.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import fetch from "node-fetch";
-import { ageOfPost, urlParamsFix, xmlToJSON } from "./utils.js";
+import { urlParamsFix, xmlToJSON } from "./utils.js";
 
 // -- Constants -- //
 const atomLink = env.UPWORK_LINK;
@@ -40,15 +40,14 @@ setTimeout(async () => {
         xml = fs.readFileSync(feedXml, 'utf8');
     }
 
-    const json = await xmlToJSON(xml);
-    // [json.items.at(-1)]
-    json.items.forEach((item) => {
-        log('\n\n\n')
-        log(`${ageOfPost(item).string} -- ${item.title}` + '\n\n', item.content);
-        log(item.extras);
-        
-    });
+    let json = await xmlToJSON(xml);
+    // json.items = [json.items.at(-1)];
 
-    log('length', json.items.length)
+    // json.items.forEach((item) => {
+    //     log('\n\n\n')
+    //     log(`${ageOfPost(item).string} -- ${item.title}` + '\n\n', item.content);
+    //     log(item.extras); 
+    // });
+
     fs.writeFileSync(feedJson, JSON.stringify(json, null, 2));
 });

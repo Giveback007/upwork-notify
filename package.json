@@ -2,9 +2,10 @@
   "name": "upwork-notify",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "./dist/index.js",
   "scripts": {
     "start": "nodemon --exec ts-node ./app/main.ts",
+    "test": "nodemon --exec ts-node ./app/test.ts",
     "build": "rm -rf dist && tsc",
     "run-build": "node ./dist/main.js"
   },
@@ -13,6 +14,9 @@
   "license": "ISC",
   "type": "module",
   "nodemonConfig": {
+    "watch": [
+      "./app"
+    ],
     "ignore": [
       "*.xml",
       "*.json"
@@ -20,12 +24,12 @@
   },
   "dependencies": {
     "dotenv": "^16.0.3",
-    "he": "^1.2.0",
     "node-fetch": "^3.3.1",
+    "node-telegram-bot-api": "^0.61.0",
     "xml2js": "^0.6.0"
   },
   "devDependencies": {
-    "@types/he": "^1.2.0",
+    "@types/node-telegram-bot-api": "^0.61.6",
     "@types/xml2js": "^0.4.11",
     "nodemon": "^2.0.22",
     "ts-node": "^10.9.1",
