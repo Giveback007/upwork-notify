@@ -36,10 +36,12 @@ export async function xmlToJSON(xml: string) {
             title: x.title[0]._.replace(/ - Upwork$/, ''),
             updated: x.updated[0],
             linkHref: x.link[0].$.href,
-            content: cleanUpContent(x.content[0]._),
         } as FeedItem;
 
-        // item.age = ageOfPost(item);
+        const uncleanContent = x.content[0]._;
+        const { main, record } = parseContent(uncleanContent);
+        item.content = main;
+        item.extras = record as any;
         return item;
     });
     
@@ -55,23 +57,47 @@ export async function xmlToJSON(xml: string) {
 export function ageOfPost(item: FeedItem) {
         const now = new Date().getTime();
         const date = new Date(item.updated).getTime();
-        const ageMillis = now - date;
+        const ageMs = now - date;
     
-        const ageSeconds = ageMillis / 1000;
-        const ageMinutes = ageSeconds / 60;
-        const h = Math.floor(ageMinutes / 60);
-        const m = Math.floor(ageMinutes % 60);
+        const ageS = ageMs / 1000;
+        const ageM = ageS / 60;
+        const h = Math.floor(ageM / 60);
+        const m = Math.floor(ageM % 60);
     
         return { h, m, string: `${h}h ${m}m` };
 }
 
 export const cleanUpContent = (input: string) => input
+    .replace(/<br\s*\/?>/g, '\n')
     .replace(/<[^>]*>/g, '')
     .replace(/click to apply\s*$/, '')
+    .replace(/(\n{2,})/g, (match) => '\n'.repeat(match.length - 1))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
     .trim();
 
-// .replace(/&amp;/g, '&')
-// .replace(/&lt;/g, '<')
-// .replace(/&gt;/g, '>')
-// .replace(/&quot;/g, '"')
-// .replace(/&#039;/g, "'")
+function parseContent(content: string) {
+    const record: Record<string, string> = {};
+    const lastTripleBreakIndex = content.lastIndexOf('<br /><br /><br />');
+    
+    // Separate the main content from the rest
+    const mainContent = content.substring(0, lastTripleBreakIndex).trim();
+    const remainingContent = content.substring(lastTripleBreakIndex + 15).trim();
+
+    // Split the remaining content into key-value pairs
+    const pairs = remainingContent.split('<br />');
+
+    pairs.forEach((pair) => {
+        let [key = '', val = ''] = pair.split(/:(.+)/);
+        if (!key.includes('<b>')) return;
+
+        // get the key between the <b> tags
+        key = key.substring(key.indexOf('<b>') + 3, key.indexOf('</b>'));
+        record[key] = cleanUpContent(val.replace(/\s{2,}/g, ' '));
+    });
+
+    return { main: cleanUpContent(mainContent), record };
+}

@@ -26,6 +26,7 @@ setTimeout(async () => {
     const link = urlParamsFix(atomLink, {
         sort: 'recency',
         paging: '0;20',
+        // paging: '0;100', // MAX
     });
 
     let xml: string
@@ -40,11 +41,14 @@ setTimeout(async () => {
     }
 
     const json = await xmlToJSON(xml);
-    [json.items[0]].forEach((item) => {
+    // [json.items.at(-1)]
+    json.items.forEach((item) => {
         log('\n\n\n')
         log(`${ageOfPost(item).string} -- ${item.title}` + '\n\n', item.content);
-        log(item?.linkHref);
+        log(item.extras);
         
     });
+
+    log('length', json.items.length)
     fs.writeFileSync(feedJson, JSON.stringify(json, null, 2));
 });

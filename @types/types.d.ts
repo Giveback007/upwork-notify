@@ -18,6 +18,15 @@ type FeedItem = {
     updated: string;
     linkHref: string;
     content: string;
+    extras: {
+        'Posted On': string;
+        'Category': string;
+        'Country': string;
+        'Skills'?: string;
+        'Budget'?: string;
+        'Hourly Range'?: string;
+        'Location Requirement'?: string;
+    }
     // age: {
     //     h: number;
     //     m: number;
