@@ -29,6 +29,7 @@
     "xml2js": "^0.6.0"
   },
   "devDependencies": {
+    "@types/node": "^20.2.5",
     "@types/node-telegram-bot-api": "^0.61.6",
     "@types/xml2js": "^0.4.11",
     "nodemon": "^2.0.22",

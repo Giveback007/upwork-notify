@@ -1,22 +1,39 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import fetch from "node-fetch";
 import * as xml2js from 'xml2js';
+import { Bot } from "../bot.js";
+import { readJSON, writeJSON } from "./utils.js";
+
+export async function getFeed(link: string, num: 10 | 20 | 50 | 100 = 20) {
+    link = urlParamsFix(link, {
+        sort: 'recency',
+        paging: `0;${num}`,
+    });
+
+    //! if xml is cached, use it (for testing purposes)
+    // const cachedXML = await readJSON<string>('../data/feed.xml');
+    // if (cachedXML) return await xmlToJSON(cachedXML);
+
+    try {
+        const response = await fetch(link);
+        const xml = await response.text();
+        // cache the xml
+        writeJSON('../data/feed.xml', xml);
+        return await xmlToJSON(xml);
+    } catch (error) {
+        Bot.sendError(error);
+        return null;
+    }
+}
 
 export function urlParamsFix(link: string, addParams: { [key: string]: string } = {}) {
     const url = new URL(link);
     Object.entries(addParams).forEach(([key, value]) =>
-        url.searchParams.set(key, value));
-
-    // Save to file: to keep track of the url params 
-    const urlObject = Object.fromEntries(url.searchParams);
-    const filePath = path.join(mainFileDirectory, '../data/url-params.json');
-    fs.writeFileSync(filePath, JSON.stringify(urlObject, null, 2));
-
+    url.searchParams.set(key, value));
 
     return url.toString();
 }
 
-export async function xmlToJSON(xml: string) {
+async function xmlToJSON(xml: string) {
     const parser = new xml2js.Parser();
     const { feed: json } = await parser.parseStringPromise(xml);
 
@@ -41,8 +58,8 @@ export async function xmlToJSON(xml: string) {
         const uncleanContent = x.content[0]._;
         const { main, record } = parseContent(uncleanContent);
         item.content = main;
-        item.extras = record as any;
-        return item;
+        
+        return { ...item, ...record };
     });
     
     // when you want to test with only one item
@@ -54,20 +71,7 @@ export async function xmlToJSON(xml: string) {
     return json as Feed;
 }
 
-export function ageOfPost(item: FeedItem) {
-        const now = new Date().getTime();
-        const date = new Date(item.updated).getTime();
-        const ageMs = now - date;
-    
-        const ageS = ageMs / 1000;
-        const ageM = ageS / 60;
-        const h = Math.floor(ageM / 60);
-        const m = Math.floor(ageM % 60);
-    
-        return { h, m, string: `${h}h ${m}m` };
-}
-
-export const cleanUpContent = (input: string) => input
+const cleanUpContent = (input: string) => input
     .replace(/<br\s*\/?>/g, '\n')
     .replace(/<[^>]*>/g, '')
     .replace(/click to apply\s*$/, '')
@@ -80,7 +84,7 @@ export const cleanUpContent = (input: string) => input
     .trim();
 
 function parseContent(content: string) {
-    const record: Record<string, string> = {};
+    const record = {} as FeedItemExtras;
     const lastTripleBreakIndex = content.lastIndexOf('<br /><br /><br />');
     
     // Separate the main content from the rest
@@ -96,8 +100,16 @@ function parseContent(content: string) {
 
         // get the key between the <b> tags
         key = key.substring(key.indexOf('<b>') + 3, key.indexOf('</b>'));
-        record[key] = cleanUpContent(val.replace(/\s{2,}/g, ' '));
+        (record as any)[key] = cleanUpContent(val.replace(/\s{2,}/g, ' '));
     });
 
+    //! TODO: fix this
+    // if (!cleanUpContent(mainContent)) {
+    //     log({
+    //         content,
+    //         mainContent,
+    //         cleanContent: cleanUpContent(mainContent),
+    //     })
+    // }
     return { main: cleanUpContent(mainContent), record };
 }

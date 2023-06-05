@@ -14,8 +14,6 @@
         "baseUrl": "./",
         "rootDir": "./app",
         "outDir": "./dist",
-
-        /* -- Basic Options -- */
         "allowJs": true,
         "checkJs": true,
         "declaration": false,
