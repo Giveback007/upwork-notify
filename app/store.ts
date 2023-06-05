@@ -1,5 +1,5 @@
-import { readJSON, time, writeJSON } from "./utils/utils.js";
-import { State } from "./state.utils.js";
+import { readJSON, time, writeJSON } from "./utils/utils";
+import { State } from "./utils/state.utils";
 
 const statePath = '../data/state.json';
 

@@ -1,6 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { atomURL } from './store.js';
-import { joinMain, time } from './utils/utils.js';
+import { atomURL } from './store';
+import { joinMain, time } from './utils/utils';
 
 // https://t.me/${env.BOT_USERNAME}
 const bot = new TelegramBot(env.TELEGRAM_BOT_TOKEN);

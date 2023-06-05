@@ -9,13 +9,13 @@
  */
 
 // -- Init -- //
-import './init.js';
+import './init';
 
 // -- Imports -- //
-import { Bot } from './bot.js';
-import { atomURL, timeParams } from './store.js';
-import { getFeed } from './utils/feed.utils.js';
-import { ageOfPost, arrToRecord, readJSON, time, writeJSON } from './utils/utils.js';
+import { Bot } from './bot';
+import { atomURL, timeParams } from './store';
+import { getFeed } from './utils/feed.utils';
+import { ageOfPost, arrToRecord, readJSON, time, writeJSON } from './utils/utils';
 
 // -- App Start -- //
 setTimeout(async () => {
@@ -23,6 +23,7 @@ setTimeout(async () => {
     intervalCheckForJobs();
 
     Bot.send(env.START_MSG);
+    log('App Started');
 });
 
 // -- Functions -- //
@@ -99,5 +100,6 @@ process.on('uncaughtException', (err) => {
 // @ts-ignore
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
     // Application specific logging, throwing an error, or other logic here
 });

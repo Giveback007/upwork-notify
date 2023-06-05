@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import * as xml2js from 'xml2js';
-import { Bot } from "../bot.js";
-import { readJSON, writeJSON } from "./utils.js";
+import { Bot } from "../bot";
+import { writeJSON } from "./utils";
 
 export async function getFeed(link: string, num: 10 | 20 | 50 | 100 = 20) {
     link = urlParamsFix(link, {
