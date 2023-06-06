@@ -6,30 +6,35 @@ import { joinMain, time } from './utils/utils';
 const bot = new TelegramBot(env.TELEGRAM_BOT_TOKEN);
 
 export const Bot = new class Bot {
-    private messages: { chatId: string, msg: string }[] = [];
+    private messages: ({ msg: string } & BotSendOpt)[] = [];
 
-    send = (msg: string, chatId: string = env.CHAT_ID) =>
+    send = (opt: { msgs: string | string[] } & BotSendOpt) =>
     {
-        // if a msg is longer than 4096 chars, split it
-        if (msg.length > 4096) {
-            const msgs = msg.match(/.{1,4089}/g); // Split to less: 4096 - 7 for (1/3) part = 4089
-            if (msgs) {
-                msgs.forEach((msgPart, index) => {
-                    // Adding the message part information
-                    const msgWithPartInfo = `(${index+1}/${msgs.length}) ${msgPart}`;
-                    this.messages.push({ chatId, msg: msgWithPartInfo });
-                });
+        let { msgs, chatId, type } = opt;
+
+        if (typeof msgs === 'string') msgs = [msgs];
+
+        msgs.forEach(msg => {
+            if (msg.length > 4096) {
+                const msgs = msg.match(/.{1,4089}/g); // Split to less: 4096 - 7 for (1/3) part = 4089
+                if (msgs) {
+                    msgs.forEach((msgPart, index) => {
+                        // Adding the message part information
+                        msg = `(${index+1}/${msgs.length}) ${msgPart}`;
+                        this.messages.push({ chatId, msg, type });
+                    });
+                }
+            } else {
+                this.messages.push({ chatId, msg, type });
             }
-        } else {
-            this.messages.push({ chatId, msg });
-        }
+        });
     
         this.sendMessages();
     }
 
     sendError = (error: Error, chatId: string = env.CHAT_ID) =>
     {
-        this.send(`Error: ${error.message}`, chatId);
+        this.send({msgs: `Error: ${error.message}`, chatId});
     }
 
     start = () =>
@@ -45,8 +50,9 @@ export const Bot = new class Bot {
     private isSending = false;
     private msgTimings: number[] = [];
     private lastMsgTime = 0;
-    private readonly msgTiming = time.sec(1.1);
+    private readonly msgTiming = time.sec(env.isDev ? 1 : 2);
     private readonly msgClrTime = time.min(1.1);
+    private readonly maxMsgs = env.isDev ? 5 : 20;
     private sendMessages = async () =>
     {
         if (this.messages.length === 0 || this.isSending) return;
@@ -55,16 +61,19 @@ export const Bot = new class Bot {
         const now = Date.now();
         this.msgTimings = this.msgTimings.filter(n => n > now - this.msgClrTime);
 
-        if (this.msgTimings.length >= 20 || this.lastMsgTime > now - this.msgTiming) {
+        if (this.msgTimings.length >= this.maxMsgs || this.lastMsgTime > now - this.msgTiming) {
             setTimeout(this.sendMessages, this.msgTiming);
             return;
         }
         
         try {
-            const { chatId, msg } = this.messages.shift()!;
+            const { chatId = env.CHAT_ID, msg, type } = this.messages.shift()!;
             this.isSending = true;
 
-            await bot.sendMessage(chatId, msg);
+            await bot.sendMessage(chatId, msg, {
+                parse_mode: type === 'MD' ? 'MarkdownV2' : undefined,
+                disable_web_page_preview: true
+            });
         } catch (err) {
             log(err);
         }finally {
@@ -85,7 +94,7 @@ bot.onText(/\/url( .+)?/, async (msg, match) => {
         // Ignore messages older than 1 minute
         msg.date < (Date.now() / 1000) - 60
         ||
-        // Only allow the group chat
+        // Only allow the corresponding chat id
         id !== env.CHAT_ID
     ) return;
 
@@ -100,11 +109,6 @@ bot.onText(/\/url( .+)?/, async (msg, match) => {
     }
   
     atomURL.set({ url, lastChecked: 0 });
-    const msgRes = await bot.sendMessage(chatId, 'URL set');
-    traceLog({
-        msg,
-        msgRes
-    });
 });
 
 // bot.onText(/\/setFreq/, async (msg) => {

@@ -1,11 +1,8 @@
 /**
- * The purpose of this app:
- * 1. Take a link of Upwork rss/atom feed
- * 2. Parse the feed into JSON
- * 3. ...?
- * 
- * END GOAL:
- * Send an update via telegram when a new job is posted
+ * !TODO:
+ * - Ensure msg was delivered via msgId
+ * - Allow to filter out jobs by country
+ * - Handle updated jobs
  */
 
 // -- Init -- //
@@ -15,15 +12,17 @@ import './init';
 import { Bot } from './bot';
 import { atomURL, timeParams } from './store';
 import { getFeed } from './utils/feed.utils';
-import { ageOfPost, arrToRecord, readJSON, time, writeJSON } from './utils/utils';
+import { arrToRecord, readJSON, time, writeJSON } from './utils/utils';
+import { generateMessage } from './utils/msg.utils';
 
 // -- App Start -- //
 setTimeout(async () => {
     Bot.start();
     intervalCheckForJobs();
 
-    Bot.send(env.START_MSG);
-    log('App Started');
+    Bot.send({msgs: '💻'});
+    Bot.send({msgs: env.START_MSG});
+    log('APP STARTED');
 });
 
 // -- Functions -- //
@@ -40,7 +39,7 @@ async function intervalCheckForJobs() {
     const params = timeParams.get();
     
     if (timeSinceCheck < params.freq) return again();
-        
+    
     const oldFeed = readJSON<Feed | null>('../data/feed.json');
     const feed = await getFeed(url, oldFeed ? 20 : 100);
 
@@ -55,34 +54,42 @@ async function intervalCheckForJobs() {
     const oldItems = (oldFeed?.items || []).filter(x => !jobIsTooOld(x));
     const oldItemsObj = arrToRecord(oldFeed?.items || [], 'id');
 
-    // Find items that have been updated
     const updatedItems = feed.items.filter(x =>
-        oldItemsObj[x.id] && oldItemsObj[x.id]?.updated !== x.updated);
+        oldItemsObj[x.id] && oldItemsObj[x.id]?.updated !== x.updated)
+        .sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime());
 
-    // Find items that are new
-    const newItems = feed.items.filter(x => !oldItemsObj[x.id] && !jobIsTooOld(x));
+    const newItems = feed.items
+        .filter(x => !oldItemsObj[x.id] && !jobIsTooOld(x))
+        .sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime());
 
-    let didSend = false;
+    const mdMsgs: string[] = [];
+
     // Send messages for updated items
     for (const item of updatedItems) {
-        const { h, m } = ageOfPost(item);
-        Bot.send(`[${h}h ${m}m ago]:\nUpdated: ${item.title}\n${item.linkHref}`);
-        didSend = true;
+        mdMsgs.push(generateMessage(item));
     }
 
     // Send messages for new items
     for (const item of newItems) {
-        const { h, m } = ageOfPost(item);
-        Bot.send(`[${h}h ${m}m ago]:\nNew: ${item.title}\n${item.linkHref}`);
-        didSend = true;
+        mdMsgs.push(generateMessage(item));
     }
 
     const itemsRec = arrToRecord([ ...oldItems, ...updatedItems, ...newItems], 'id');
     const items = Object.values(itemsRec);
 
-    if (didSend) {
-        const msg = `Total Jobs: ${items.length} in last ${(params.jobExpiry / time.hrs(1)).toFixed(1)} hours`;
-        Bot.send(msg);
+    if (updatedItems.length || newItems.length) {
+        let msg = '';
+        if (newItems.length > 0)
+            msg += `📬 New: ${newItems.length} || `;
+        
+        if (updatedItems.length > 0)
+            msg += `🔁 Updated: ${updatedItems.length} 🔄 || `;
+    
+        msg = `[${msg}past ${(params.freq / time.min(1)).toFixed(0)} mins ⏰]`;
+    
+        Bot.send({ msgs: '📬' });
+        Bot.send({ msgs: msg });
+        Bot.send({ msgs: mdMsgs });
     }
 
     writeJSON('../data/feed.json', { ...feed, items });

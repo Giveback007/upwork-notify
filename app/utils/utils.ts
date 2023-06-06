@@ -1,6 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+export function insertAt(str: string, index: number, insert: string) {
+    return str.slice(0, index) + insert + str.slice(index);
+}
+
+export function splitAt(str: string, index: number) {
+    return [str.slice(0, index), str.slice(index)];
+}
+
 export const time = {
     sec: (s: number) => s * 1000,
     min: (m: number) => m * 60000,

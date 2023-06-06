@@ -8,6 +8,9 @@ dependencies:
   dotenv:
     specifier: ^16.1.4
     version: 16.1.4
+  html-entities:
+    specifier: ^2.3.4
+    version: 2.3.4
   node-fetch:
     specifier: ^3.3.1
     version: 3.3.1
@@ -718,6 +721,10 @@ packages:
     engines: {node: '>= 0.4.0'}
     dependencies:
       function-bind: 1.1.1
+    dev: false
+
+  /html-entities@2.3.4:
+    resolution: {integrity: sha512-TtiHkpRBqP40OzizVWjwBPBsiqchEZxAg/nys6D6lIpdoVLo7sWZ/5Sf/s4UaBHQ6pzUzEr3NiItvEoO46sPtQ==}
     dev: false
 
   /http-signature@1.2.0:

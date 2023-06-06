@@ -1,17 +1,21 @@
 import fetch from "node-fetch";
 import * as xml2js from 'xml2js';
 import { Bot } from "../bot";
-import { writeJSON } from "./utils";
+import { readJSON, splitAt, writeJSON } from "./utils";
+import { decode } from 'html-entities'
 
 export async function getFeed(link: string, num: 10 | 20 | 50 | 100 = 20) {
     link = urlParamsFix(link, {
         sort: 'recency',
         paging: `0;${num}`,
+        // paging: `0;100`,
     });
 
     //! if xml is cached, use it (for testing purposes)
-    // const cachedXML = await readJSON<string>('../data/feed.xml');
-    // if (cachedXML) return await xmlToJSON(cachedXML);
+    if (env.isDev) {
+        const cachedXML = readJSON<string>('../data/feed.xml');
+        if (cachedXML) return await xmlToJSON(cachedXML);
+    }
 
     try {
         const response = await fetch(link);
@@ -71,27 +75,21 @@ async function xmlToJSON(xml: string) {
     return json as Feed;
 }
 
-const cleanUpContent = (input: string) => input
+const cleanUpContent = (input: string) => decode(input
     .replace(/<br\s*\/?>/g, '\n')
     .replace(/<[^>]*>/g, '')
     .replace(/click to apply\s*$/, '')
     .replace(/(\n{2,})/g, (match) => '\n'.repeat(match.length - 1))
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .trim();
+    .trim());
 
 function parseContent(content: string) {
     const record = {} as FeedItemExtras;
-    const lastTripleBreakIndex = content.lastIndexOf('<br /><br /><br />');
+    const breakIdx = content.lastIndexOf('<br /><br /><b>');
     
     // Separate the main content from the rest
-    const mainContent = content.substring(0, lastTripleBreakIndex).trim();
-    const remainingContent = content.substring(lastTripleBreakIndex + 15).trim();
+    const [mainContent = '', remainingContent = ''] = splitAt(content, breakIdx);
+    if (!mainContent || !remainingContent) Bot.sendError(new Error('mainContent or remainingContent is null'));
 
-    // Split the remaining content into key-value pairs
     const pairs = remainingContent.split('<br />');
 
     pairs.forEach((pair) => {
@@ -102,14 +100,5 @@ function parseContent(content: string) {
         key = key.substring(key.indexOf('<b>') + 3, key.indexOf('</b>'));
         (record as any)[key] = cleanUpContent(val.replace(/\s{2,}/g, ' '));
     });
-
-    //! TODO: fix this
-    // if (!cleanUpContent(mainContent)) {
-    //     log({
-    //         content,
-    //         mainContent,
-    //         cleanContent: cleanUpContent(mainContent),
-    //     })
-    // }
     return { main: cleanUpContent(mainContent), record };
 }

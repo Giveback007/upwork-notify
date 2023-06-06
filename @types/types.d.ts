@@ -20,6 +20,8 @@ declare const mainFileDirectory: string;
 declare const log: typeof console.log;
 declare const traceLog: (...args: any[]) => void;
 
+type BotSendOpt = { chatId?: string, type?: 'MD', msgId?: string };
+
 type AppState = {
     atomURL: AtomURL | null;
     timeParams: TimeParams;
