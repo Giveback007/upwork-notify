@@ -1,105 +1,100 @@
 /**
  * !TODO:
- * - Ensure msg was delivered via msgId
+ * - (TEST) Handle multiple urls
+ * - (TEST) Store json data for each feed to provide stats
+ * - (TEST) Handle updated jobs
+ * - (TEST) /url-add
+ * - (TEST) /url
+ * - (TEST) /url-delete
+ * 
+ * - Ensure msg was delivered
  * - Allow to filter out jobs by country
- * - Handle updated jobs
  */
 
 // -- Init -- //
 import './init';
 
 // -- Imports -- //
-import { Bot } from './bot';
-import { atomURL, timeParams } from './store';
+import { feeds as feedsState, feedParams, bot, hashId } from './store';
 import { getFeed } from './utils/feed.utils';
-import { arrToRecord, readJSON, time, writeJSON } from './utils/utils';
+import { arrToRecord, msToTime, storeFeedItems, time } from './utils/utils';
 import { generateMessage } from './utils/msg.utils';
+import { updateMsgTimes } from './bot/commands.bot';
 
 // -- App Start -- //
 setTimeout(async () => {
-    Bot.start();
-    intervalCheckForJobs();
+    try {
+        bot.start();
+        checkFeeds();
+        updateMsgTimes();
 
-    Bot.send({msgs: '💻'});
-    Bot.send({msgs: env.START_MSG});
-    log('APP STARTED');
+        bot.send({msg: '💻'});
+        bot.send({msg: env.START_MSG});
+        log('APP STARTED');
+    } catch(error) {
+        bot.sendError(error);
+        log('APP ERROR');
+    }
 });
 
 // -- Functions -- //
-const again = (n = 1000): any => setTimeout(intervalCheckForJobs, n);
-const jobIsTooOld = (job: FeedItem) => new Date(job.updated).getTime() < (Date.now() - timeParams.get().jobExpiry);
+const jobIsTooOld = (job: FeedItem) => new Date(job.updated).getTime() < (Date.now() - feedParams.get().jobExpiry);
 
-async function intervalCheckForJobs() {
-    const urlObj = atomURL.get();
-    if (!urlObj) return again();
-    
+async function checkFeeds() {
+    const { feedItemCount, defCheckFreq } = feedParams.get();
+    const feeds = Object.entries(feedsState.get());
     const now = Date.now();
-    const { lastChecked, url } = urlObj;
-    const timeSinceCheck = now - lastChecked;
-    const params = timeParams.get();
-    
-    if (timeSinceCheck < params.freq) return again();
-    
-    const oldFeed = readJSON<Feed | null>('../data/feed.json');
-    const feed = await getFeed(url, oldFeed ? 20 : 100);
 
-    if (!feed) { // If feed is null check again in 2 minutes
-        atomURL.set({ url, lastChecked: now - params.freq + time.min(2) });
-        return again();
-    } else {
-        atomURL.set({ url, lastChecked: now });
-    }
-
-    // Filter out jobs that are too old
-    const oldItems = (oldFeed?.items || []).filter(x => !jobIsTooOld(x));
-    const oldItemsObj = arrToRecord(oldFeed?.items || [], 'id');
-
-    const updatedItems = feed.items.filter(x =>
-        oldItemsObj[x.id] && oldItemsObj[x.id]?.updated !== x.updated)
-        .sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime());
-
-    const newItems = feed.items
-        .filter(x => !oldItemsObj[x.id] && !jobIsTooOld(x))
-        .sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime());
-
-    const mdMsgs: string[] = [];
-
-    // Send messages for updated items
-    for (const item of updatedItems) {
-        mdMsgs.push(generateMessage(item));
-    }
-
-    // Send messages for new items
-    for (const item of newItems) {
-        mdMsgs.push(generateMessage(item));
-    }
-
-    const itemsRec = arrToRecord([ ...oldItems, ...updatedItems, ...newItems], 'id');
-    const items = Object.values(itemsRec);
-
-    if (updatedItems.length || newItems.length) {
-        let msg = '';
-        if (newItems.length > 0)
-            msg += `📬 New: ${newItems.length} || `;
+    const proms = feeds.map(async ([hashId, feed]) => {
+        const freq = feed.checkFreq || defCheckFreq;
+        if (feed.lastChecked + freq > now) return;
         
-        if (updatedItems.length > 0)
-            msg += `🔁 Updated: ${updatedItems.length} 🔄 || `;
-    
-        msg = `[${msg}past ${(params.freq / time.min(1)).toFixed(0)} mins ⏰]`;
-    
-        Bot.send({ msgs: '📬' });
-        Bot.send({ msgs: msg });
-        Bot.send({ msgs: mdMsgs });
-    }
+        try {
+            const url = feed.rssUrl;
+            const items = await getFeed(url, feedItemCount);
+            if (!items) throw new Error(`Error fetching feed: ${hashId}`);
 
-    writeJSON('../data/feed.json', { ...feed, items });
-    return again();
+            newFeedHandler({ ...feed, items, lastChecked: now });
+        } catch (error) {
+            log(error);
+
+            bot.send({ msg: `Error fetching feed: "${feed.name}"` });
+            feedsState.update({ [hashId]: { ...feed, lastChecked: now } });
+        }
+    });
+
+    Promise.allSettled(proms).then(() =>
+        setTimeout(checkFeeds, time.min(1)));
+}
+
+function newFeedHandler(newFeed: Feed) {
+    // store the feed items to json for later analytics
+    storeFeedItems(newFeed);
+
+    const feedId = hashId(newFeed.rssUrl);
+    const feeds = feedsState.get();
+    const freq = newFeed.checkFreq || feedParams.get().defCheckFreq;
+    
+    const items = (feeds[feedId]?.items || []).filter(x => !jobIsTooOld(x));
+    const itemsRec = arrToRecord(items, 'linkHref');
+
+    const newItems = items
+        .filter(job => !jobIsTooOld(job) && !itemsRec[job.linkHref]);
+
+    if (!newItems.length) return;
+
+    const { h, m } = msToTime(freq)
+    bot.send({ msg: '📨' });
+    bot.send({ msg: `[📶: ${newFeed.name} || 📬: ${newItems.length} || ⏰: ${h}h ${m}m]`})
+    newItems.forEach(job =>
+        bot.send({ msg: generateMessage(job), type: 'job' }));
+
+    feedsState.update({ [feedId]: { ...newFeed, items } });
 }
 
 // @ts-ignore
 process.on('uncaughtException', (err) => {
     console.error('An uncaughtException was found, the program will end.');
-    // Ideally you would also log this to an external system here
     console.error(err.stack);
     process.exit(1);
 });
@@ -108,5 +103,4 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
     process.exit(1);
-    // Application specific logging, throwing an error, or other logic here
 });

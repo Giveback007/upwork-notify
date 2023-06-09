@@ -1,4 +1,4 @@
-import { ageOfPost } from "./utils";
+import { msToTime } from "./utils";
 
 const map = {
     'Country': '[🌎]: ',
@@ -9,11 +9,12 @@ const map = {
 }
 
 export function generateMessage(feedItem: FeedItem) {
-    const { id, title, updated, linkHref, content, Category, ...ext } = feedItem;
-    const { h, m } = ageOfPost(feedItem);
+    const { title, updated, linkHref, content, Category, ...ext } = feedItem;
+    const { str } = ageOfPost(feedItem);
 
+    // TODO:
     // `${type === 'updated' ? '[UPDATE]:' : ''}
-    const message = `[⏱️ ${h}h ${m}m ago]:
+    const message = `[${str} ago]:
 [🏷️]: ${Category}
 [🔍]: ${title}
 [🔗]: ${linkHref}
@@ -33,7 +34,23 @@ ${
 
 [[ 📝 DETAILS ]]: 
 ${content}`;
-//! TODO:
+// TODO:
 // ${updated !== ext['Posted On'] ? `🔄 *Updated*: ${updated}` : ''}
     return message;
+}
+
+export function ageOfPost(item: FeedItem) {
+    const t = new Date(item.updated).getTime();
+    const ageMs = Date.now() - t;
+
+    const {d, h, m} = msToTime(ageMs);
+
+    let str;
+    if (d > 0) {
+        str = `Older than ${d} day${d > 1 ? 's' : '' }`;
+    } else {
+        str = `${h}h ${m}m`;
+    }
+
+    return { d, h, m, str };
 }

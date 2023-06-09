@@ -1,31 +1,43 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { ZodSchema, z } from 'zod';
+import { hashId } from '../store';
 
-export function insertAt(str: string, index: number, insert: string) {
-    return str.slice(0, index) + insert + str.slice(index);
+export function storeFeedItems(feed: Feed) {
+    const hash = hashId(feed.rssUrl);
+    const filePath = `../data/feeds/${hash}.json`;
+
+    const items = readJSON<Record<string, FeedItem>>(filePath) || {};
+    feed.items.forEach((item) => items[item.linkHref] = item);
+
+    writeJSON(filePath, items);
 }
 
-export function splitAt(str: string, index: number) {
-    return [str.slice(0, index), str.slice(index)];
+export const handleZod = <T extends ZodSchema>(zSchema: T, data: any) => {
+    try {
+        return {
+            type: 'SUCCESS' as const,
+            data: zSchema.parse(data) as ReturnType<T['parse']>,
+        }
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            console.error('Validation failed');
+            console.error(error.errors);
+            return { type: 'ZOD_ERROR' as const, error };
+        } else {
+            return {
+                type: 'ERROR' as const,
+                error: error instanceof Error ? error : new Error(error)
+            };
+        }
+    }
 }
 
 export const time = {
     sec: (s: number) => s * 1000,
     min: (m: number) => m * 60000,
     hrs: (h: number) => h * 3600000,
-}
-
-export function ageOfPost(item: FeedItem) {
-        const now = new Date().getTime();
-        const date = new Date(item.updated).getTime();
-        const ageMs = now - date;
-    
-        const ageS = ageMs / 1000;
-        const ageM = ageS / 60;
-        const h = Math.floor(ageM / 60);
-        const m = Math.floor(ageM % 60);
-    
-        return { h, m, string: `${h}h ${m}m` };
+    day: (d: number) => d * 86400000,
 }
 
 export const wait = (ms: number) =>
@@ -34,11 +46,18 @@ export const wait = (ms: number) =>
 export const joinMain = (filePath: string) =>
     path.join(mainFileDirectory, filePath);
 
-export const writeFile = (path: string, data: string) =>
-    fs.writeFileSync(joinMain(path), data);
+export const writeFile = (pth: string, data: string) => {
+    const pathToFile = joinMain(pth);
+    // Create directory if it doesn't exist
+    fs.mkdirSync(path.dirname(pathToFile), { recursive: true });
+
+    // Write file
+    fs.writeFileSync(pathToFile, data);
+}
 
 export const readFile = (path: string) =>
 {
+    log('readFile', path);
     if (!fs.existsSync(joinMain(path))) return null;
     return fs.readFileSync(joinMain(path), 'utf8');
 }
@@ -59,12 +78,6 @@ export function arrToRecord<
         return rec;
 }
 
-export const uuid = () =>
-    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-
 export function msToTime(msT: number) {
     const ms = (msT % 1000);
     let s = Math.floor(msT / 1000);
@@ -79,59 +92,3 @@ export function msToTime(msT: number) {
 
     return { d, h, m, s, ms };
 }
-
-/** An extended `typeof` */
-export function type(val: any): JsType
-{
-    if (val === null) return 'null';
-    if (Array.isArray(val)) return 'array';
-    if (val !== val) return 'NaN';
-    if (val instanceof Date) return 'date';
-    return typeof val;
-}
-
-/**
- * The function will test if the type of the first
- * argument equals testType. Argument testType is a string
- * representing a javascript type.
- *
- * @param val value to be tested
- * @param testType to check if typeof val === testType
- * @example
- * ```js
- * isType([], 'array') //=> true
- * isType(null, 'undefined') //=> false
- * ```
- */
-export const isType = <T extends JsType> (
-    val: any, testType: T
-): val is JsTypeFind<T> => type(val) === testType;
-
-type JsType =
-    | 'array'
-    | 'bigint'
-    | 'boolean'
-    | 'function'
-    | 'NaN'
-    | 'null'
-    | 'number'
-    | 'object'
-    | 'string'
-    | 'symbol'
-    | 'undefined'
-    | 'date'
-    | 'never';
-
-type JsTypeFind<S extends JsType> =
-    S extends 'array'       ? any[] :
-    S extends 'bigint'      ? bigint :
-    S extends 'boolean'     ? boolean :
-    S extends 'function'    ? Function :
-    S extends 'NaN'         ? typeof NaN :
-    S extends 'null'        ? null :
-    S extends 'number'      ? number :
-    S extends 'object'      ? object :
-    S extends 'string'      ? string :
-    S extends 'symbol'      ? symbol :
-    S extends 'undefined'   ? undefined :
-    S extends 'date'        ? Date : never;

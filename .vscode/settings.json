@@ -1,4 +1,9 @@
 {
     "remote.SSH.defaultForwardedPorts": [],
-    "remote.SSH.remoteServerListenOnSocket": true
+    "remote.SSH.remoteServerListenOnSocket": true,
+    "code-runner.executorMap": {
+        "javascript": "node",
+        "typescript": "tsx",
+        "runInTerminal": true
+    }
 }

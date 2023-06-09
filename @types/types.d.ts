@@ -1,66 +1,8 @@
-type ENV = {
-    isDev: boolean;
-
-    ENV: string;
-    UPWORK_LINK: string;
-
-    CHAT_ID: string;
-    // TELEGRAM_GROUP_ID: string;
-    // BOT_DEV_ID: string;
-
-    TELEGRAM_BOT_TOKEN: string;
-    BOT_USERNAME: string;
-    BOT_NAME: string;
-
-    START_MSG: string;
-};
-
-declare const env: ENV;
-declare const mainFileDirectory: string;
-declare const log: typeof console.log;
-declare const traceLog: (...args: any[]) => void;
-
-type BotSendOpt = { chatId?: string, type?: 'MD', msgId?: string };
-
-type AppState = {
-    atomURL: AtomURL | null;
-    timeParams: TimeParams;
-}
-
-type Feed = {
-    updated: string;
-    rssUrl: string;
-    items: FeedItem[];
-}
-
-type FeedItem = {
-    id: string;
-    title: string;
-    updated: string;
-    linkHref: string;
-    content: string;
-} & FeedItemExtras;
-
-type FeedItemExtras = {
-    'Posted On': string;
-    'Category': string;
-    'Country': string;
-    'Skills'?: string;
-    'Budget'?: string;
-    'Hourly Range'?: string;
-    'Location Requirement'?: string;
-}
-
-type AtomURL = {
-    url: string;
-    lastChecked: number;
-}
-
 type AnyObj = {
-    [key: string]: any;
+    [key: string | number | symbol]: any;
 };
 
-
+type HashType = 'md5' | 'sha1' | 'sha256' | 'sha512' | 'sha3-256' | 'sha3-512' | 'blake2b512' | 'blake2s256';
 
 // -- TUPELIFY -- //
 type UnionToIntersection<U> = (

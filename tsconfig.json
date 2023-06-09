@@ -12,7 +12,7 @@
         "target": "ES2022",
         "lib": ["ES2022"],
         "baseUrl": "./",
-        "rootDir": "./app",
+        "rootDir": "./",
         "outDir": "./dist",
         "allowJs": true,
         "checkJs": true,
@@ -22,6 +22,7 @@
         "importHelpers": true,
         "downlevelIteration": true,
         "sourceMap": true,
+        "pretty": true,
 
         /* Additional Options */
         "esModuleInterop": true,

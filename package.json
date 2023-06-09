@@ -3,16 +3,20 @@
   "version": "1.0.0",
   "description": "",
   "main": "./dist/index.js",
+  "type": "module",
   "scripts": {
-    "start": "tsx watch --inspect app/main.ts",
-    "start:prod": "pm2 start npx --name upn -- tsx app/main.ts",
+    "start": "concurrently --kill-others-on-fail -t -n node,tsc -c green,blue \"pnpm tsx-watch\" \"pnpm ts-check\"",
+    "tsx-watch": "tsx watch --inspect app/main.ts",
+    "ts-check": "tsc --watch --noEmit",
     "build": "rm -rf dist && tsc",
-    "run-build": "node ./dist/main.js"
+    "start:prod": "pm2 start npx --name upn -- tsx app/main.ts",
+    "start:prod2": "pm2 start npx --name upn2 -- run build",
+    "run-build": "node --experimental-specifier-resolution=node ./dist/main.js",
+    "test": "tsx mocha.test.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "nodemonConfig": {
     "watch": [
       "./app"
@@ -24,15 +28,20 @@
   },
   "dependencies": {
     "dotenv": "^16.1.4",
-    "html-entities": "^2.3.4",
     "node-fetch": "^3.3.1",
     "node-telegram-bot-api": "^0.61.0",
-    "xml2js": "^0.6.0"
+    "xml2js": "^0.6.0",
+    "zod": "^3.21.4"
   },
   "devDependencies": {
+    "@types/chai": "^4.3.5",
+    "@types/mocha": "^10.0.1",
     "@types/node": "^20.2.5",
     "@types/node-telegram-bot-api": "^0.61.6",
     "@types/xml2js": "^0.4.11",
+    "chai": "^4.3.7",
+    "concurrently": "^8.1.0",
+    "mocha": "^10.2.0",
     "tsx": "^3.12.7",
     "typescript": "^5.1.3"
   }
