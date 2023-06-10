@@ -12,24 +12,26 @@ url_del - Delete an Upwork url
 urls - Get the list of urls
 */
 
-export function updateMsgTimes() {
+
+export function updateMsgs() {
     const now = Date.now();
+
     // stop updating messages older than 1 days
     const msgs = Object.entries(jobMsgs.get())
-        .filter(([_, msg]) => now - msg.date * 1000 < time.day(1));
+        .filter(([, msg]) => now - msg.date * 1000 < time.day(1));
     
     jobMsgs.set(Object.fromEntries(msgs));
 
     const map = feedItems.get();
-    msgs.forEach(([feedItemId, msg]) => {
+    msgs.forEach(([, { msgId, chatId, feedItemId }]) => {
         const item = map.get(feedItemId);
-        if (!item) return;
+        if (!item) return console.log(`FeedItem not found: ${feedItemId}`);
 
-        const msgUpdate = generateMessage(item);
-        bot.update({ msg: msgUpdate, msgId: msg.message_id });
+        const updateMsg = generateMessage(item);
+        bot.update({ updateMsg, msgId, chatId });
     });
 
-    setTimeout(updateMsgTimes, time.min(1));
+    setTimeout(updateMsgs, time.min(1));
 }
 
 // --- // ChatStates Types // --- //
@@ -46,17 +48,17 @@ type IChatState = {
 }
 
 type UrlAddState = IChatState & {
-    type: '/url-add';
+    type: '/url_add';
     step: 'URL' | 'NAME';
 } & Partial<FeedParams>;
 
 type UrlDeleteState = IChatState & {
-    type: '/url-delete';
+    type: '/url_delete';
     feedIds: string[];
 }
 
 type UrlUpdateState = IChatState & {
-    type: '/url-update';
+    type: '/url_update';
     feedIds: string[];
     step: 'URL' | 'NAME';
 } & Partial<FeedParams>;
@@ -92,15 +94,15 @@ function chatStateHandler(state: ChatStates, text: string | undefined): any {
     const { chatId, userId } = state;
 
     switch (state.type) {
-        case '/url-add':
+        case '/url_add':
             if (state.step === 'URL') { // Step 1
                 if (!text.includes('https://www.upwork.com/ab/feed/jobs/atom')) {
                     chatStates.delete(chatId);
 
-                    bot.send({ chatId, msg: '/url command cancelled'})
+                    bot.send({ chatId, msg: '"/url_add" command cancelled'})
                     bot.send({ chatId, msg: `Please provide a valid 'ATOM' link and write /url again` });
                     bot.send({ chatId, msg: `Go here to get one:\nhttps://www.upwork.com/nx/jobs/search/` });
-                    bot.send({ chatId, msg: joinMain('../assets/example-1.png') });
+                    bot.send({ chatId, msg: joinMain('../assets/example-1.png'), type: 'img' });
                     return;
                 }
                 
@@ -136,7 +138,7 @@ function chatStateHandler(state: ChatStates, text: string | undefined): any {
                 chatStates.delete(chatId);
             }
             break;
-        case '/url-delete':
+        case '/url_delete':
                 const n = parseInt(text, 10);
                 if (isNaN(n) || n < 1 || n > state.feedIds.length) {
                     bot.send({ chatId, msg: `Invalid number. Please respond with a number between 1 and ${state.feedIds.length}.` });
@@ -181,7 +183,7 @@ bot.onText(/^\/url_add$/, (_msg) => {
     // Save the state for this chat
     chatStates.set(chatId, {
         ...from,
-        type: '/url-add',
+        type: '/url_add',
         step: 'URL',
         _updated: Date.now(),
     });
@@ -224,7 +226,7 @@ bot.onText(/^\/url_del$/, (_msg) => {
     } else {
         chatStates.set(chatId, {
             ...from,
-            type: '/url-delete',
+            type: '/url_delete',
             feedIds,
             _updated: Date.now(),
         });

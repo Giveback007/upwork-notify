@@ -1,24 +1,19 @@
 /**
  * !TODO:
- * - (TEST) Handle multiple urls
- * - (TEST) Store json data for each feed to provide stats
- * - (TEST) /url-add
- * - (TEST) /url
- * - (TEST) /url-delete
- * 
- * - Ensure msg was delivered
+ * - Ensure msg was delivered before storing the corresponding feed item
  * - Allow to filter out jobs by country
+ * - Analytics for each feed (hour by hour n of post by day of week)
  */
 
 // -- Init -- //
 import './init';
 
 // -- Imports -- //
-import { feeds as feedsState, feedParams, bot, hashId } from './store';
+import { feeds as feedsState, feedParams, bot } from './store';
 import { getFeed } from './utils/feed.utils';
-import { arrToRecord, msToTime, storeFeedItems, time } from './utils/utils';
+import { arrToRecord, getTime, msToTime, storeFeedItems, time } from './utils/utils';
 import { generateMessage } from './utils/msg.utils';
-import { updateMsgTimes } from './bot/commands.bot';
+import { updateMsgs } from './bot/commands.bot';
 
 // -- App Start -- //
 setTimeout(async () => {
@@ -29,7 +24,7 @@ setTimeout(async () => {
         checkFeeds();
         log('[2]: FEED CHECKER STARTED');
 
-        updateMsgTimes();
+        updateMsgs();
         log('[3]: MSG TIMES-UPDATER STARTED');
 
         bot.send({msg: '💻'});
@@ -42,7 +37,7 @@ setTimeout(async () => {
 });
 
 // -- Functions -- //
-const jobIsTooOld = (job: FeedItem) => new Date(job.updated).getTime() < (Date.now() - feedParams.get().jobExpiry);
+const jobIsTooOld = (job: FeedItem, noOlderThan: number) => getTime(job.updated) < (Date.now() - noOlderThan);
 
 async function checkFeeds(): Promise<any> {
     const { feedItemCount, defCheckFreq } = feedParams.get();
@@ -58,7 +53,7 @@ async function checkFeeds(): Promise<any> {
             const items = await getFeed(url, feedItemCount);
             if (!items) throw new Error(`Error fetching feed: ${hashId}`);
 
-            newFeedHandler({ ...feed, items, lastChecked: now });
+            newFeedHandler(hashId, { ...feed, items, lastChecked: now });
         } catch (error) {
             log(error);
 
@@ -67,41 +62,41 @@ async function checkFeeds(): Promise<any> {
         }
     });
     
-    log(`Checking ${feeds.length} feeds`)
+    log(`Checking ${feeds.length} feed(s)`)
     Promise.allSettled(proms).then(() =>
         setTimeout(checkFeeds, time.min(1)));
     log(`Next check in 1 min`);
 }
 
-function newFeedHandler(newFeed: Feed) {
+function newFeedHandler(hashId: string, newFeed: Feed) {
     // store the feed items to json for later analytics
     storeFeedItems(newFeed);
 
-    const feedId = hashId(newFeed.rssUrl);
     const feeds = feedsState.get();
     const freq = newFeed.checkFreq || feedParams.get().defCheckFreq;
     
-    const oldItems = (feeds[feedId]?.items || []).filter(x => !jobIsTooOld(x));
+    const oldItems = (feeds[hashId]?.items || []).filter(x => !jobIsTooOld(x, freq * 2));
     const itemsRec = arrToRecord(oldItems, 'linkHref');
 
-    const newItems = oldItems
-        .filter(job => !jobIsTooOld(job) && !itemsRec[job.linkHref]);
+    const newItems = newFeed.items
+        .filter(job => !jobIsTooOld(job, freq * 2) && !itemsRec[job.linkHref])
+        .sort((a, b) => getTime(a.updated) - getTime(b.updated));
 
     newItems.forEach(job => itemsRec[job.linkHref] = job);
     const items = Object.values(itemsRec);
 
     if (!newItems.length) {
-        feedsState.update({ [feedId]: { ...newFeed, items } });
+        feedsState.update({ [hashId]: { ...newFeed, items } });
         return;
     }
 
-    const { h, m } = msToTime(freq)
+    const { h, m } = msToTime(freq);
     bot.send({ msg: '📨' });
     bot.send({ msg: `[📶: ${newFeed.name} || 📬: ${newItems.length} || ⏰: ${h}h ${m}m]`})
     newItems.forEach(job =>
-        bot.send({ msg: generateMessage(job), type: 'job' }));
+        bot.send({ msg: generateMessage(job), type: 'job', feedItemId: job.linkHref }));
 
-    feedsState.update({ [feedId]: { ...newFeed, items } });
+    feedsState.update({ [hashId]: { ...newFeed, items } });
 }
 
 // @ts-ignore

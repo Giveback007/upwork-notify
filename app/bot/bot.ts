@@ -10,17 +10,17 @@ const addPartInfo = (msg: string) => splitUpString(msg, 4089)
 export class Bot extends TelegramBot {
     private actions: BotActions[] = [];
 
-    send = (opt: Omit<BotSendMsg, '_t'>) =>
+    send = (opt: BotSendMsg) =>
     {
-        const obj = { ...opt, _t: 'send-msg' } as BotSendMsg;
+        const obj = { ...opt, _t: 'send-msg' as const };
         const { msg } = obj;
 
         const splitMsgs =
             msg.length > 4096 ? addPartInfo(msg) : [msg];
 
         splitMsgs.forEach(msg => this.actions.push({
-            ...opt, msg, _t: 'send-msg'
-        } as BotSendMsg));
+            ...obj, msg,
+        }));
 
         this.startRateLimiter();
     }
@@ -88,14 +88,24 @@ export class Bot extends TelegramBot {
         try {
             this.isSending = true;
 
-            const botMsg = await this.sendMessage(chatId, msg, {
+            if (obj.type === 'img') {
+                await this.sendPhoto(chatId, msg);
+                return;
+            }
+
+            const { message_id, date } = await this.sendMessage(chatId, msg, {
                 // parse_mode: type === 'MD' ? 'MarkdownV2' : undefined,
                 disable_web_page_preview: true
             });
 
             // Update job message
             if (rest.type === 'job') {
-                jobMsgs.update({ [rest.feedItemId]: botMsg });
+                jobMsgs.update({ [this.genMsgId(chatId, message_id)]: {
+                    chatId,
+                    msgId: message_id.toString(),
+                    date: date * 1000,
+                    feedItemId: rest.feedItemId,
+                } });
             }
         } catch (err) {
             log(err);
@@ -108,22 +118,22 @@ export class Bot extends TelegramBot {
     }
 
     private executeUpdate = async (obj: BotUpdateMsg) => {
-        const { msgId, msg } = obj;
-        const msgs = jobMsgs.get();
-        const x = msgs[msgId];
-        if (!x) return log(`No message found with id ${msgId}`);
-
-        const { chat, message_id } = x;
+        const { msgId, updateMsg, chatId } = obj;
+        const jobMsgsData = jobMsgs.get();
+        const jobMsg = jobMsgsData[this.genMsgId(chatId, msgId)];
+        if (!jobMsg) return log(`No message found with id ${msgId}`);
 
         // now update the message via the telegram bot api
         try {
-            await this.editMessageText(msg, {
-                chat_id: chat.id,
-                message_id: message_id,
+            await this.editMessageText(updateMsg, {
+                chat_id: chatId,
+                message_id: Number(jobMsg.msgId),
                 disable_web_page_preview: true
             });
         } catch (err) {
             log(err);
         }
     }
+
+    genMsgId = (chatId: string | number, msgId: string | number) => `${chatId}-${msgId}`;
 }

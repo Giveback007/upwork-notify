@@ -9,7 +9,7 @@ import { bot, feeds } from "../store";
 
 export const genFeed = ({ items, lastChecked, checkFreq, ...rest }: FeedParams): Feed => ({
     items: items ?? [],
-    lastChecked: 0 ?? lastChecked,
+    lastChecked: lastChecked ?? 0,
     checkFreq: checkFreq ?? null,
     ...rest,
 });

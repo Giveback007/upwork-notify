@@ -5,10 +5,10 @@
             "type": "node",
             "request": "launch",
             "name": "Launch via tsx",
-            "runtimeExecutable": "npm",
+            "runtimeExecutable": "pnpm",
             "runtimeArgs": [
                 "run-script",
-                "start"
+                "tsx-watch"
             ]
         }, {
             "type": "node",

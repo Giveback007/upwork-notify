@@ -1,20 +1,25 @@
 type BotActions =
-    | BotSendMsg
-    | BotUpdateMsg;
+    | { _t: 'send-msg' } & BotSendMsg
+    | { _t: 'update-msg' } & BotUpdateMsg;
 
-type BotSendMsg = ({
+type BotSendMsg = {
     type?: 'any-msg';
+    chatId?: string;
+    msg: string;
 } | {
     type: 'job';
-    feedItemId: string;
-}) & {
-    _t: 'send-msg';
-    msg: string;
     chatId?: string;
+    msg: string;
+    feedItemId: string;
+} | {
+    type: 'img';
+    chatId?: string;
+    /** img path */
+    msg: string;
 };
 
 type BotUpdateMsg = {
-    _t: 'update-msg';
-    msgId: number | string;
-    msg: string;
+    msgId: string;
+    chatId: string;
+    updateMsg: string;
 }

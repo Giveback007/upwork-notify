@@ -1,19 +1,7 @@
 import { readJSON, time, writeJSON } from "./utils/utils";
 import { MapState, ObjState, State } from "./utils/state.utils";
-import type { Message } from "node-telegram-bot-api";
 import { Bot } from "./bot/bot";
 import { hashString } from "./utils/string.utils";
-
-export type AppState = {
-    _v: 1;
-    feedParams: FeedCheckParams;
-    feeds: {
-        /** The hash id is generated with the feed Atom Link */
-        [hashId: string]: Feed;
-    };
-    /** Msgs that the bot sent */
-    jobMsgs: { [feedItemId: string]: Message };
-}
 
 /** When the state structure changes this number will be changed */
 const stateVersion = 1;
@@ -38,7 +26,6 @@ function readState(): AppState {
             _v: stateVersion,
             feedParams: {
                 defCheckFreq: time.min(20),
-                jobExpiry: time.hrs(3),
                 dayStart: 7,
                 dayEnd: 22,
                 feedItemCount: 20,
@@ -74,6 +61,10 @@ jobMsgs.on('change', (botMsgs) => writeState({ jobMsgs: botMsgs }));
 
 // -/-/- // -- feedItems -- // -/-/- //
 export const feedItems = new MapState<string, FeedItem>();
+Object.values(feeds.get()).forEach((feed) => feed.items.forEach((item) => {
+    feedItems.update(item.linkHref, item);
+}));
+
 feeds.on('change', (feeds) => {
     Object.values(feeds).forEach((feed) => feed.items.forEach((item) => {
         feedItems.update(item.linkHref, item);

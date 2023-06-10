@@ -51,6 +51,7 @@ const htmlEntitiesMap = {
     "&lt;": "<",
     "&gt;": ">",
     "&apos;": "'",
+    "&#039;": "'",
     "&quot;": "\"",
     "&nbsp;": " ",
     "&copy;": "©",

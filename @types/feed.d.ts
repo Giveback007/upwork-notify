@@ -35,7 +35,6 @@ type FeedItemExtras = {
 
 type FeedCheckParams = {
     defCheckFreq: number;
-    jobExpiry: number;
     dayStart: number;
     dayEnd: number;
     /** How many items to return from the feed */

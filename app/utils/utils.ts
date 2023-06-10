@@ -94,3 +94,7 @@ export function msToTime(msT: number) {
 
     return { d, h, m, s, ms };
 }
+
+export function getTime(date: string | number | Date) {
+    return new Date(date).getTime();
+}
