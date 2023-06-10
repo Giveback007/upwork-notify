@@ -1,7 +1,6 @@
 import { readJSON, time, writeJSON } from "./utils/utils";
 import { MapState, ObjState, State } from "./utils/state.utils";
 import { Bot } from "./bot/bot";
-import { hashString } from "./utils/string.utils";
 
 /** When the state structure changes this number will be changed */
 const stateVersion = 1;
@@ -48,8 +47,6 @@ export const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
 // -/-/- // -- feeds -- // -/-/- //
 export const feeds = new ObjState(defState.feeds);
 feeds.on('change', (feeds) => writeState({ feeds }));
-
-export const hashId = (url: string) => hashString(url, 'md5');
 
 // -/-/- // -- timeParams -- // -/-/- //
 export const feedParams = new State(defState.feedParams);

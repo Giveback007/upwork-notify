@@ -1,7 +1,9 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import fs from 'fs';
+import path from 'path';
 import { ZodSchema, z } from 'zod';
-import { hashId } from '../store';
+import { hashString } from './string.utils';
+
+export const hashId = (url: string) => hashString(url, 'md5');
 
 export function storeFeedItems(feed: Feed) {
     const hash = hashId(feed.rssUrl);
