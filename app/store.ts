@@ -28,6 +28,7 @@ function readState(): AppState {
                 dayStart: 7,
                 dayEnd: 22,
                 feedItemCount: 20,
+                maxJobAge: time.hrs(3),
             },
             feeds: {},
             jobMsgs: {},

@@ -1,4 +1,5 @@
-import { msToTime } from "./utils";
+import { feedParams } from "../store";
+import { msToTime, time } from "./utils";
 
 const map = {
     'Country': '[🌎]: ',
@@ -44,12 +45,13 @@ ${content}`;
 export function ageOfPost(item: FeedItem) {
     const t = new Date(item.updated).getTime();
     const ageMs = Date.now() - t;
+    const { maxJobAge } = feedParams.get();
 
     const {d, h, m} = msToTime(ageMs);
 
     let str;
-    if (d > 0) {
-        str = `Older than ${d} day${d > 1 ? 's' : '' }`;
+    if (time.hrs(h) > maxJobAge) {
+        str = `Older than ${h} hours... (Stopped updating)`;
     } else {
         str = `${h}h ${m}m`;
     }

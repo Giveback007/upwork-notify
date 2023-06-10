@@ -39,4 +39,6 @@ type FeedCheckParams = {
     dayEnd: number;
     /** How many items to return from the feed */
     feedItemCount: 10 | 20 | 50 | 100;
+    /** At which point to stop updating the job-msg */
+    maxJobAge: number;
 }

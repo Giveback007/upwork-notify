@@ -1,5 +1,5 @@
 import { handleZod, hashId, joinMain, time } from "../utils/utils";
-import { bot, feedItems, feeds, jobMsgs } from "../store";
+import { bot, feedItems, feeds, jobMsgs, feedParams } from "../store";
 import { generateMessage } from "../utils/msg.utils";
 import { filterFeeds, genFeed } from "../utils/feed.utils";
 import { feedItemParamsSchema } from "../schemas/feed-item-params.schema";
@@ -13,25 +13,31 @@ urls - Get the list of urls
 */
 
 
-export function updateMsgs() {
+export function updateMsgs()
+{
+    log('Updating messages...');
     const now = Date.now();
-
-    // stop updating messages older than 1 days
-    const msgs = Object.entries(jobMsgs.get())
-        .filter(([, msg]) => now - msg.date * 1000 < time.day(1));
-    
-    jobMsgs.set(Object.fromEntries(msgs));
-
     const map = feedItems.get();
-    msgs.forEach(([, { msgId, chatId, feedItemId }]) => {
-        const item = map.get(feedItemId);
-        if (!item) return console.log(`FeedItem not found: ${feedItemId}`);
+    const { maxJobAge } = feedParams.get();
 
-        const updateMsg = generateMessage(item);
-        bot.update({ updateMsg, msgId, chatId });
+    // stop updating messages older than maxJobAge hours
+    const msgs = Object.entries(jobMsgs.get())
+        .filter(([, { msgId, chatId, feedItemId, date }]) => {
+            if (now - date * 1000 > maxJobAge) return false;
+
+            const item = map.get(feedItemId);
+            if (!item) {
+                console.log(`FeedItem not found: ${feedItemId}`);
+                return false;
+            };
+
+            const updateMsg = generateMessage(item);
+            bot.update({ updateMsg, msgId, chatId });
+            return true;
     });
 
-    setTimeout(updateMsgs, time.min(1));
+    jobMsgs.set(Object.fromEntries(msgs));
+    setTimeout(updateMsgs, time.min(1.5));
 }
 
 // --- // ChatStates Types // --- //
