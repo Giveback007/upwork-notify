@@ -100,14 +100,14 @@ function newFeedHandler(hashId: string, newFeed: Feed) {
 }
 
 // @ts-ignore
-process.on('uncaughtException', (err) => {
+(process as any).on('uncaughtException', (err) => {
     console.error('An uncaughtException was found, the program will end.');
     console.error(err.stack);
     process.exit(1);
 });
 
 // @ts-ignore
-process.on('unhandledRejection', (reason, promise) => {
+(process as any).on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
     process.exit(1);
 });
