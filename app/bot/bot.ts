@@ -50,9 +50,9 @@ export class Bot extends TelegramBot {
     private isSending = false;
     private msgTimings: number[] = [];
     private lastMsgTime = 0;
-    private readonly msgTiming = time.sec(env.isDev ? 1 : 2);
+    private readonly msgTiming = time.sec(1.5);
     private readonly msgClrTime = time.min(1.1);
-    private readonly maxMsgs = env.isDev ? 6 : 20;
+    private readonly maxMsgs = env.isDev ? 10 : 20;
     private startRateLimiter = async () =>
     {
         if (this.actions.length === 0 || this.isSending) return;

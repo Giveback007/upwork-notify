@@ -2,7 +2,6 @@
  * !TODO:
  * - (TEST) Handle multiple urls
  * - (TEST) Store json data for each feed to provide stats
- * - (TEST) Handle updated jobs
  * - (TEST) /url-add
  * - (TEST) /url
  * - (TEST) /url-delete
@@ -25,12 +24,17 @@ import { updateMsgTimes } from './bot/commands.bot';
 setTimeout(async () => {
     try {
         bot.start();
+        log('[1]: BOT STARTED');
+
         checkFeeds();
+        log('[2]: FEED CHECKER STARTED');
+
         updateMsgTimes();
+        log('[3]: MSG TIMES-UPDATER STARTED');
 
         bot.send({msg: '💻'});
         bot.send({msg: env.START_MSG});
-        log('APP STARTED');
+        log('[Final]: APP INITIALIZED');
     } catch(error) {
         bot.sendError(error);
         log('APP ERROR');
@@ -40,7 +44,7 @@ setTimeout(async () => {
 // -- Functions -- //
 const jobIsTooOld = (job: FeedItem) => new Date(job.updated).getTime() < (Date.now() - feedParams.get().jobExpiry);
 
-async function checkFeeds() {
+async function checkFeeds(): Promise<any> {
     const { feedItemCount, defCheckFreq } = feedParams.get();
     const feeds = Object.entries(feedsState.get());
     const now = Date.now();
@@ -62,9 +66,11 @@ async function checkFeeds() {
             feedsState.update({ [hashId]: { ...feed, lastChecked: now } });
         }
     });
-
+    
+    log(`Checking ${feeds.length} feeds`)
     Promise.allSettled(proms).then(() =>
         setTimeout(checkFeeds, time.min(1)));
+    log(`Next check in 1 min`);
 }
 
 function newFeedHandler(newFeed: Feed) {
@@ -75,13 +81,19 @@ function newFeedHandler(newFeed: Feed) {
     const feeds = feedsState.get();
     const freq = newFeed.checkFreq || feedParams.get().defCheckFreq;
     
-    const items = (feeds[feedId]?.items || []).filter(x => !jobIsTooOld(x));
-    const itemsRec = arrToRecord(items, 'linkHref');
+    const oldItems = (feeds[feedId]?.items || []).filter(x => !jobIsTooOld(x));
+    const itemsRec = arrToRecord(oldItems, 'linkHref');
 
-    const newItems = items
+    const newItems = oldItems
         .filter(job => !jobIsTooOld(job) && !itemsRec[job.linkHref]);
 
-    if (!newItems.length) return;
+    newItems.forEach(job => itemsRec[job.linkHref] = job);
+    const items = Object.values(itemsRec);
+
+    if (!newItems.length) {
+        feedsState.update({ [feedId]: { ...newFeed, items } });
+        return;
+    }
 
     const { h, m } = msToTime(freq)
     bot.send({ msg: '📨' });

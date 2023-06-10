@@ -25,6 +25,7 @@ export async function getFeed(atomUrl: string, num: FeedCheckParams['feedItemCou
 
     //! if xml is cached, use it (for testing purposes)
     if (env.isDev) {
+        log('DEV MODE: Using cached xml')
         const cachedXML = readJSON<string>(xmlPath);
         if (cachedXML) return await xmlToJSON(cachedXML);
     }

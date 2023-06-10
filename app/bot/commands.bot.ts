@@ -5,11 +5,18 @@ import { filterFeeds, genFeed } from "../utils/feed.utils";
 import { feedItemParamsSchema } from "../schemas/feed-item-params.schema";
 import { Message } from "node-telegram-bot-api";
 
+/*
+Commands:
+url_add - Add an Upwork url
+url_del - Delete an Upwork url
+urls - Get the list of urls
+*/
+
 export function updateMsgTimes() {
     const now = Date.now();
-    // remove messages older than 2 days
+    // stop updating messages older than 1 days
     const msgs = Object.entries(jobMsgs.get())
-        .filter(([_, msg]) => now - msg.date * 1000 < time.day(2));
+        .filter(([_, msg]) => now - msg.date * 1000 < time.day(1));
     
     jobMsgs.set(Object.fromEntries(msgs));
 
@@ -68,15 +75,14 @@ setInterval(() => {
 
 // State msg checker
 bot.on('message', (msg) => {
-    const { chat, text, from } = msg;
-    const chatId = chat.id.toString();
-    const userId = from?.id.toString() || null;
-    const isBot = from?.is_bot || false;
+    const from = vldtMsg(msg);
+    if (!from) return;
+    const { chatId, isBot, userId } = from;
 
     const state = chatStates.get(chatId);
     if (!isBot && state && userId === state.userId) {
         state._updated = Date.now();
-        chatStateHandler(state, text);
+        chatStateHandler(state, msg.text);
     }
 });
 
@@ -88,7 +94,7 @@ function chatStateHandler(state: ChatStates, text: string | undefined): any {
     switch (state.type) {
         case '/url-add':
             if (state.step === 'URL') { // Step 1
-                if (!text.includes('https://www.upwork.com/ab/feed/jobs/atom') || !text.includes(' ')) {
+                if (!text.includes('https://www.upwork.com/ab/feed/jobs/atom')) {
                     chatStates.delete(chatId);
 
                     bot.send({ chatId, msg: '/url command cancelled'})
@@ -103,11 +109,16 @@ function chatStateHandler(state: ChatStates, text: string | undefined): any {
                 
                 bot.send({ chatId, msg: `Great! Now a "Name" for this feed` });
             } else if (state.step === 'NAME') { // Step 2
-                state.name = text;
+                const feedsData = feeds.get();
+                const feed = Object.values(feedsData).find((feed) => feed.name === text);
+                if (feed) {
+                    bot.send({ chatId, msg: `ERROR: Name "${text}" is already being used.\n\nPlease try again with a different name.` });
+                    return;
+                }
 
                 const zOut = handleZod(feedItemParamsSchema, {
                     chatId,
-                    name: state.name,
+                    name: text,
                     rssUrl: state.rssUrl,
                     userId
                 });
@@ -119,7 +130,7 @@ function chatStateHandler(state: ChatStates, text: string | undefined): any {
                 data.lastChecked = Date.now();
 
                 feeds.update({ [hashId(data.rssUrl)]: genFeed(data) });
-                bot.send({ chatId, msg: `Feed added:\nName: ${state.name}\nURL: ${state.rssUrl}`});
+                bot.send({ chatId, msg: `Feed added:\nName: ${text}\nURL: ${state.rssUrl}`});
 
                 // Remove the state as we're done with this process
                 chatStates.delete(chatId);
@@ -136,6 +147,7 @@ function chatStateHandler(state: ChatStates, text: string | undefined): any {
                     if (!feed) return bot.send({ chatId, msg: `ERROR: Feed not found.` });
 
                     delete feedsData[hash];
+                    feeds.set(feedsData);
     
                     // Send a confirmation message to the chat
                     bot.send({ chatId, msg: `Deleted URL: ${feed.name}` });
@@ -161,7 +173,7 @@ const vldtMsg = (msg: Message) => {
 }
 
 // COMMAND: '/url-add' (start feed adding process)
-bot.onText(/^\/url-add$/, (_msg) => {
+bot.onText(/^\/url_add$/, (_msg) => {
     const from = vldtMsg(_msg);
     if (!from) return;
     const { chatId } = from;
@@ -184,30 +196,28 @@ bot.onText(/^\/urls$/, (_msg) => {
     if (!from) return;
     const { chatId } = from;
 
-    // Get the feeds from the store
-    const feedsData = feeds.get();
-
     // Filter out the feeds that were not added by this user
-    const userFeeds = Object.values(feedsData).filter(feed => feed.chatId === chatId);
+    const userFeeds = Object.values(feeds.get());
 
     if (userFeeds.length === 0) {
         bot.send({ chatId, msg: `No URLs added yet.` });
     } else {
-        const msgText = userFeeds.map(feed => `Name: ${feed.name}\nURL: ${feed.rssUrl}`).join('\n\n');
+        const msgText = 
+            '[📶 Upwork Feeds]:\n\n' +
+            userFeeds.map((feed, i) => `${i + 1}. ${feed.name}\nURL: ${feed.rssUrl}`)
+            .join('\n\n');
         bot.send({ chatId, msg: msgText });
     }
 });
 
 // COMMAND: '/url-delete' (start feed deleting process)
-bot.onText(/^\/url-delete$/, (_msg) => {
+bot.onText(/^\/url_del$/, (_msg) => {
     const from = vldtMsg(_msg);
     if (!from) return;
     const { chatId } = from;
 
     const feedsData = feeds.get();
     const feedIds = filterFeeds({ chatId }, true);
-
-        filterFeeds({ chatId }, true);
 
     if (feedIds.length === 0) {
         bot.send({ chatId, msg: `No URLs added yet.` });
@@ -227,36 +237,5 @@ bot.onText(/^\/url-delete$/, (_msg) => {
 
         // Ask the user which feed they want to delete
         bot.send({ chatId, msg: `Which feed to delete? Answer with a number 1 to ${feedIds.length}.\n\n${msgText}` });
-    }
-});
-
-// COMMAND: '/url-update' (start feed updating process)
-bot.onText(/^\/url-update$/, (_msg) => {
-    const from = vldtMsg(_msg);
-    if (!from) return;
-    const { chatId } = from;
-
-    const feedsData = feeds.get();
-    const feedIds = filterFeeds({ chatId }, true);
-
-    if (feedIds.length === 0) {
-        bot.send({ chatId, msg: `No URLs added yet.` });
-    } else {
-        chatStates.set(chatId, {
-            ...from,
-            type: '/url-update',
-            feedIds,
-            step: 'URL',
-            _updated: Date.now(),
-        });
-
-        // Generate the numbered list of feeds
-        const msgText = feedIds.map((hash, i) => {
-            const feed = feedsData[hash]!;
-            return `${i + 1}: ${feed.name}`
-        }).join('\n');
-
-        // Ask the user which feed they want to update
-        bot.send({ chatId, msg: `Which feed do you want to update? Please respond with the number.\n\n${msgText}` });
     }
 });

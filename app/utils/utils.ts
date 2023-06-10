@@ -65,8 +65,10 @@ export const readFile = (path: string) =>
 export const readJSON = <T>(path: string): T | null =>
     JSON.parse(readFile(path) || null as any);
 
-export const writeJSON = (path: string, json: any) =>
+export const writeJSON = (path: string, json: any) => {
+    log('writeJSON', path);
     writeFile(path, JSON.stringify(json, null, 2));
+}
 
 export function arrToRecord<
     T extends AnyObj

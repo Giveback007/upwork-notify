@@ -14,7 +14,9 @@ export function generateMessage(feedItem: FeedItem) {
 
     // TODO:
     // `${type === 'updated' ? '[UPDATE]:' : ''}
-    const message = `[${str} ago]:
+    const message = `
+-------------------
+[${str} ago]:
 [🏷️]: ${Category}
 [🔍]: ${title}
 [🔗]: ${linkHref}

@@ -1,9 +1,9 @@
-import fetch from 'node-fetch';
+// @ts-nocheck
 import './init';
 import { xmlToJSON } from "./utils/feed.utils";
 import { readJSON, writeJSON } from './utils/utils';
 import { hashString } from './utils/string.utils';
-import { isType } from './utils/utils';
+import { isType } from './utils/test.utils';
 
 let url = "https://www.upwork.com/ab/feed/jobs/atom?api_params=1&contractor_tier=1%2C2&duration_v3=week&orgUid=1622242556971261953&paging=0%3B20&proposals=0-4&q=video%20editing&securityToken=d247917a634d198f50252bf18d7e2bbbc434c3ba31fa9008baf70e3e9611d3ae88288bd0cef7e90a2da58bb8313fb9f91a5d9975f2c082cb7724741024d1b800&sort=recency&userUid=1622242556971261952";
 
