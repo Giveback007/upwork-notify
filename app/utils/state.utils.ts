@@ -21,6 +21,7 @@ export class State <T> extends EventEmitter {
 
     get = () => this._value;
 
+    // @ts-ignore
     on(event: string, listener: (val: T, oldVal?: T) => any) {
         // @ts-ignore
         super.on(event, listener);
