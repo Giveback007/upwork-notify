@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url'
 import * as dotenv from 'dotenv';
 
 {
-    const tuple: TupleKeys<ENV> = ["isDev", "ENV", "UPWORK_LINK", "CHAT_ID", "TELEGRAM_BOT_TOKEN", "BOT_USERNAME", "BOT_NAME", "START_MSG"];
+    const tuple: TupleKeys<ENV> = ["isDev", "ENV", "CHAT_ID", "TELEGRAM_BOT_TOKEN", "BOT_USERNAME", "BOT_NAME", "START_MSG"];
     const o = dotenv.config().parsed;
     if (!o) throw new Error('No .env file found');
 

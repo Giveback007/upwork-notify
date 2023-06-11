@@ -3,17 +3,18 @@
  * - Ensure msg was delivered before storing the corresponding feed item
  * - Allow to filter out jobs by country
  * - Analytics for each feed (hour by hour n of post by day of week)
+ * - Validate is user is allowed to use the bot
+ * - Proper multi user support (+ no more than 30msg per sec for all users)
  */
 
 // -- Init -- //
 import './init';
 
 // -- Imports -- //
-import { feeds as feedsState, feedParams, bot } from './store';
+import { feeds as feedsState, feedParams, bot, feedItems, jobMsgs } from './store';
 import { getFeed } from './utils/feed.utils';
 import { arrToRecord, getTime, msToTime, storeFeedItems, time } from './utils/utils';
 import { generateMessage } from './utils/msg.utils';
-import { updateMsgs } from './bot/commands.bot';
 
 // -- App Start -- //
 setTimeout(async () => {
@@ -27,8 +28,12 @@ setTimeout(async () => {
         updateMsgs();
         log('[3]: MSG TIMES-UPDATER STARTED');
 
-        bot.send({msg: '💻'});
-        bot.send({msg: env.START_MSG});
+        // async import the commands
+        await import('./bot/commands.bot');
+        log('[4]: COMMANDS INITIALIZED');
+
+        bot.send({ msg: '💻' });
+        bot.send({ msg: env.START_MSG });
         log('[Final]: APP INITIALIZED');
     } catch(error) {
         bot.sendError(error);
@@ -53,7 +58,7 @@ async function checkFeeds(): Promise<any> {
             const items = await getFeed(url, feedItemCount);
             if (!items) throw new Error(`Error fetching feed: ${hashId}`);
 
-            newFeedHandler(hashId, { ...feed, items, lastChecked: now });
+            feedUpdatesHandler(hashId, { ...feed, items, lastChecked: now });
         } catch (error) {
             log(error);
 
@@ -68,7 +73,7 @@ async function checkFeeds(): Promise<any> {
     log(`Next check in 1 min`);
 }
 
-function newFeedHandler(hashId: string, newFeed: Feed) {
+function feedUpdatesHandler(hashId: string, newFeed: Feed) {
     // store the feed items to json for later analytics
     storeFeedItems(newFeed);
 
@@ -92,7 +97,7 @@ function newFeedHandler(hashId: string, newFeed: Feed) {
 
     const { h, m } = msToTime(freq);
     bot.send({ msg: '📨' });
-    bot.send({ msg: `[📶: ${newFeed.name} || 📬: ${newItems.length} || ⏰: ${h}h ${m}m]`})
+    bot.send({ msg: `[📶]: ${newFeed.name}\n[📬]: ${newItems.length}\n[⏰]: ${h}h ${m}m]`})
     newItems.forEach(job =>
         bot.send({ msg: generateMessage(job), type: 'job', feedItemId: job.linkHref }));
 
@@ -111,3 +116,30 @@ function newFeedHandler(hashId: string, newFeed: Feed) {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
     process.exit(1);
 });
+
+export function updateMsgs()
+{
+    log('Updating messages...');
+    const now = Date.now();
+    const map = feedItems.get();
+    const { maxJobAge } = feedParams.get();
+
+    // stop updating messages older than maxJobAge hours
+    const msgs = Object.entries(jobMsgs.get())
+        .filter(([, { msgId, chatId, feedItemId, date }]) => {
+            if (now - date * 1000 > maxJobAge) return false;
+
+            const item = map.get(feedItemId);
+            if (!item) {
+                console.log(`FeedItem not found: ${feedItemId}`);
+                return false;
+            };
+
+            const updateMsg = generateMessage(item);
+            bot.update({ updateMsg, msgId, chatId });
+            return true;
+    });
+
+    jobMsgs.set(Object.fromEntries(msgs));
+    setTimeout(updateMsgs, time.min(1.5));
+}

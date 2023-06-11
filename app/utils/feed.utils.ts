@@ -127,17 +127,19 @@ export function parseContent(content: string) {
     return { content: cleanUpContent(mainContent), extras };
 }
 
-type FeedFilters = { userId?: string, chatId?: string };
+type FeedFilters = { userId?: string, chatId?: string, feedIds?: string[] };
 export function filterFeeds(filters: FeedFilters): Feed[];
 export function filterFeeds(filters: FeedFilters, getIds: false): Feed[];
 export function filterFeeds(filters: FeedFilters, getIds: true): string[];
 export function filterFeeds(filters: FeedFilters, getIds: boolean = false): Feed[] | string[] {
     const feedArr = Object.entries(feeds.get());
-    const { userId, chatId } = filters;
+    const { userId, chatId, feedIds } = filters;
     
-    const filteredFeeds = feedArr.filter(([,fd]) => {
-        if (userId && fd.userId !== userId) return false;
-        if (chatId && fd.chatId !== chatId) return false;
+    const filteredFeeds = feedArr.filter(([feedHashId,fd]) => {
+        if (feedIds && !feedIds.includes(feedHashId))   return false;
+        if (userId  && fd.userId !== userId)            return false;
+        if (chatId  && fd.chatId !== chatId)            return false;
+        
         return true;
     });
 

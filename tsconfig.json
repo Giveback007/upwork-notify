@@ -46,7 +46,7 @@
         "noUncheckedIndexedAccess": true,
         "noImplicitOverride": true,
         "noPropertyAccessFromIndexSignature": true,
-        "noFallthroughCasesInSwitch": false,
+        "noFallthroughCasesInSwitch": true,
         "useUnknownInCatchVariables": false,
 
         /* -- Module Resolution Options -- */

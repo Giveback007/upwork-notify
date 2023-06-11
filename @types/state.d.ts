@@ -1,5 +1,5 @@
 type AppState = {
-    _v: 1;
+    _v: number;
     feedParams: FeedCheckParams;
     feeds: {
         /** The hash id is generated with the feed Atom Link */

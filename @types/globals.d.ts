@@ -2,7 +2,6 @@ type ENV = {
     isDev: boolean;
 
     ENV: string;
-    UPWORK_LINK: string;
 
     CHAT_ID: string;
 

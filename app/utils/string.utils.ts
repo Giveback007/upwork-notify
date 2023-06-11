@@ -48,6 +48,7 @@ const entityRegex = /&[^;]+;/g;
 
 const htmlEntitiesMap = {
     "&amp;": "&",
+    "&apm;": "&",
     "&lt;": "<",
     "&gt;": ">",
     "&apos;": "'",
@@ -75,7 +76,7 @@ const htmlEntitiesMap = {
     "&lsaquo;": "‹",
     "&rsaquo;": "›",
     "&oline;": "‾",
-    "&frasl;": "⁄",
+    "&frasl;": "/",
     "&euro;": "€",
     "&trade;": "™",
     "&larr;": "←",

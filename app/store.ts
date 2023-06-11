@@ -3,7 +3,7 @@ import { MapState, ObjState, State } from "./utils/state.utils";
 import { Bot } from "./bot/bot";
 
 /** When the state structure changes this number will be changed */
-const stateVersion = 1;
+const stateVersion = 2;
 const statePath = `../data/state-v${stateVersion}.json`;
 
 function writeState(update: Partial<AppState>) {
@@ -32,6 +32,7 @@ function readState(): AppState {
             },
             feeds: {},
             jobMsgs: {},
+            // chatParams: {},
         };
 
         writeState(state);
