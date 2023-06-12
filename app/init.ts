@@ -1,45 +1,41 @@
-import path from 'path'
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import * as dotenv from 'dotenv';
 
 {
-    const tuple: TupleKeys<ENV> = ["isDev", "ENV", "CHAT_ID", "TELEGRAM_BOT_TOKEN", "BOT_USERNAME", "BOT_NAME", "START_MSG"];
-    const o = dotenv.config().parsed;
-    if (!o) throw new Error('No .env file found');
+    const mainDir = dirname(fileURLToPath(import.meta.url));
+    const keyFile = join(mainDir, '.key');
+    const key = readFileSync(keyFile, 'utf-8');
+    if (!key) throw new Error(`.key file is missing`);
 
-    const env: ENV = {} as any;
-    env.isDev = (o as any).ENV === 'dev';
-
-    // @ts-ignore
-    env.CHAT_ID = env.isDev ? o.BOT_DEV_ID : o.TELEGRAM_GROUP_ID;
-    if (!env.CHAT_ID) throw new Error(`.env CHAT_ID error`);
+    const o = JSON.parse(key);
+    const tuple: TupleKeys<ENV> = ["env", "bots", "users", "chats"];
 
     tuple.forEach(key => {
-        if (key === 'CHAT_ID' || key === 'isDev') return;
-
-        const value = o[key];
-        if (!value) throw new Error(`.env file is missing ${key}`);
-        return env[key] = value;
+        if (!o[key]) throw new Error(`.key file is missing ${key}`);
     });
 
-    const globals = {
-        env,
-        mainFileDirectory: path.dirname(fileURLToPath(import.meta.url)),
-        log: console.log.bind(console),
-        traceLog: (...args: any[]) => {
-            const err = new Error();
-            const stackLine = err.stack?.split('\n')[2]; // 0 is the Error line, 1 is inside this function, 2 is the caller
-            const matchResult = stackLine?.match(/\((.*)\)/);
-            const location = matchResult ? matchResult[1] : 'unknown location';
-            console.log(location);
-            console.log(...args);
+    const globals: Globals = {
+        env: { ...o, isDev: o.env === 'dev' },
+        mainFileDirectory: mainDir,
+        log: (...args: any[]) => {
+            const stackLines = new Error().stack!.split('\n');
+            const callerLine = stackLines[2] as string;
+            const callerLineParts = callerLine.split('(')[1]!.replace(')', '').split(':');
+            const callerFile = callerLineParts.slice(0, -2).join(':');
+            const callerLineNum = callerLineParts[callerLineParts.length - 2];
+            const callerCharNum = callerLineParts[callerLineParts.length - 1];
+            
+            // colors
+            const cyan = '\x1b[36m';
+            const magenta = '\x1b[35m';
+            const green = '\x1b[32m';
+            const reset = '\x1b[0m';
+        
+            console.log(`[${cyan}${callerFile}:${magenta}${callerLineNum}:${callerCharNum}${reset}]:`);
+            console.log(green, ...args, reset);
         }
     }
 
     Object.assign(globalThis, globals);
 }
-
-
-
-
-

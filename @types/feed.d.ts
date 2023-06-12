@@ -2,16 +2,19 @@ type Feed = Required<FeedParams>;
 
 type FeedParams = {
     rssUrl: string;
-
     /** id of chat where the feed is being sent */
     chatId: string;
     /** name for url given by user */
     name: string;
     /** id of user who added the url */
     userId: string;
+    /** How many items to return from the feed (when pulled online from rss/atom) */
+    feedItemCount: 10 | 20 | 50 | 100;
+    /** At which point to stop updating the job-msg */
+    maxJobAge: number;
 
-    checkFreq?: number | null;
-    items?: FeedItem[];
+    checkFreq?: number;
+    items?: string[];
     lastChecked?: number;
 };
 
@@ -31,14 +34,4 @@ type FeedItemExtras = {
     'Budget'?: string;
     'Hourly Range'?: string;
     'Location Requirement'?: string;
-}
-
-type FeedCheckParams = {
-    defCheckFreq: number;
-    dayStart: number;
-    dayEnd: number;
-    /** How many items to return from the feed */
-    feedItemCount: 10 | 20 | 50 | 100;
-    /** At which point to stop updating the job-msg */
-    maxJobAge: number;
 }

@@ -47,7 +47,18 @@ export class Bot extends TelegramBot {
         this.stopPolling();
     }
 
+    genMsgId = (chatId: string | number, msgId: string | number) => `${chatId}-${msgId}`;
+
+    // a method for validating the chatId (if the user or group is allowed to use the bot)
+    private validateChatId = (chatId: string | number) => {
+        chatId = chatId.toString();
+        
+
+    }
+
     private isSending = false;
+    // TODO: turn this into a map with chatId as key
+    // TODO: add logic to handle no more than 30-msgs/sec (for all chats)
     private msgTimings: number[] = [];
     private lastMsgTime = 0;
     private readonly msgTiming = time.sec(1.5);
@@ -134,6 +145,4 @@ export class Bot extends TelegramBot {
             log(err);
         }
     }
-
-    genMsgId = (chatId: string | number, msgId: string | number) => `${chatId}-${msgId}`;
 }

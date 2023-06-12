@@ -38,5 +38,42 @@ export function type(val: any): JsType {
     if (val instanceof Date) return 'Date';
     if (val instanceof Map) return 'Map';
     if (val instanceof Set) return 'Set';
+    if (val instanceof RegExp) return 'RegExp';
     return typeof val;
 }
+
+type JsType =
+    | 'array'
+    | 'bigint'
+    | 'boolean'
+    | 'function'
+    | 'NaN'
+    | 'null'
+    | 'number'
+    | 'object'
+    | 'string'
+    | 'symbol'
+    | 'undefined'
+    | 'Date'
+    | 'Map'
+    | 'Set'
+    | 'RegExp'
+    | 'never';
+
+type JsTypeFind<S extends JsType> =
+    S extends 'array'       ? any[] :
+    S extends 'bigint'      ? bigint :
+    S extends 'boolean'     ? boolean :
+    S extends 'function'    ? Function :
+    S extends 'NaN'         ? typeof NaN :
+    S extends 'null'        ? null :
+    S extends 'number'      ? number :
+    S extends 'object'      ? object :
+    S extends 'string'      ? string :
+    S extends 'symbol'      ? symbol :
+    S extends 'undefined'   ? undefined :
+    S extends 'Date'        ? Date :
+    S extends 'Map'         ? Map<any, any> :
+    S extends 'Set'         ? Set<any> :
+    S extends 'RegExp'      ? RegExp :
+    never;

@@ -1,18 +1,28 @@
 type ENV = {
-    isDev: boolean;
+    env: 'dev' | 'prod';
+    bots: {
+        name: string;
+        username: string;
+        token: string;
+    }[];
+    users: {
+        username: string;
+        id: string;
+        startMsg: string;
+    }[];
+    chats: {
+        id: number;
+        startMsg: string;
+        type: string;
+    }[];
+}
 
-    ENV: string;
-
-    CHAT_ID: string;
-
-    TELEGRAM_BOT_TOKEN: string;
-    BOT_USERNAME: string;
-    BOT_NAME: string;
-
-    START_MSG: string;
-};
-
-declare const env: ENV;
+declare const env: ENV & { isDev: boolean };
 declare const mainFileDirectory: string;
-declare const log: typeof console.log;
-declare const traceLog: (...args: any[]) => void;
+declare function log(...message: any[]): void
+
+type Globals = {
+    env: env,
+    mainFileDirectory: string,
+    log: typeof log,
+};
