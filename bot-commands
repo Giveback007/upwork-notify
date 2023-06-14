@@ -1,0 +1,8 @@
+url_add - Add an Upwork url
+urls - Get the list of urls
+url_del - Delete an Upwork url
+cancel - Cancel the current command
+set_timezone - Set the timezone
+set_day_start - Set the day start time
+set_day_end - Set the day end time
+chat_info - Get the chat info

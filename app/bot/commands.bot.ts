@@ -1,28 +1,21 @@
-import { genChat, genFeed, handleZod, time } from "../utils/utils";
+import { genChat, genFeed, handleZod } from "../utils/utils";
 import { bot, chats, feeds } from "../store/store";
 import { feedItemParamsSchema } from "../schemas/feed-item-params.schema";
 import TelegramBot, { Message } from "node-telegram-bot-api";
 import { filterFeeds } from "../feed";
 import { randomUUID as UUID } from 'crypto';
 import { find } from 'geo-tz';
-
-/*
-Commands:
-start - Start the bot
-stop - Stop the bot
-cancel - Cancel the current command
-url_add - Add an Upwork url
-url_del - Delete an Upwork url
-urls - Get the list of urls
-set_timezone - Set the timezone
-*/
+import { parseHhMm, time, toStrHhMm } from "../utils/time.utils";
 
 // --- // ChatStates Types // --- //
 type ChatStates =
     | UrlAddState
     | UrlDeleteState
     | UrlListState
-    | TimeZoneState;
+    | TimeZoneState
+    | SetDayStartState
+    | SetDayEndState
+    | ChatInfoState;
 
 type IChatState =
 {
@@ -64,18 +57,50 @@ type TimeZoneState = IChatState &
     timeZone?: string;
 };
 
-// -- // Command Lists // -- //
-const cmdList: (ChatStates['type'] | '/cancel')[] =
-[
-    '/url_add', '/urls', '/url_del', '/cancel',
-    '/set_timezone',
-    // '/set_day_start', '/set_day_end',
-    // '/set_start_msg', '/check_feed'
-]
+enum setDayStartStep { INIT, TIME, }
+type SetDayStartState = IChatState &
+{
+    type: '/set_day_start';
+    step?: setDayStartStep;
+    /** hour-24, minutes-59 */
+    // time?: [number, number];
+};
 
-const cmdRegx = cmdList.map((cmd) => ({
-    cmd, regx: `^${cmd}(${bot.username})?$`
-}));
+enum setDayEndStep { INIT, TIME, }
+type SetDayEndState = IChatState &
+{
+    type: '/set_day_end';
+    step?: setDayEndStep;
+    /** hour-24, minutes-59 */
+    // time?: [number, number];
+};
+
+enum chatInfoStep { INIT, }
+type ChatInfoState = IChatState &
+{
+    type: '/chat_info';
+    step?: chatInfoStep;
+};
+
+// -- // Command Lists // -- //
+export const botCmds: {
+    [cmd in ChatStates['type'] | '/cancel']: string
+} =
+{
+    '/url_add': 'Add an Upwork url',
+    '/urls': 'Get the list of urls',
+    '/url_del': 'Delete an Upwork url',
+    '/cancel': 'Cancel the current command',
+    '/set_timezone': 'Set the timezone',
+    '/set_day_start': 'Set the day start time',
+    '/set_day_end': 'Set the day end time',
+    "/chat_info": 'Get the chat info',
+    // '/set_start_msg',
+    // '/check_feed'
+}
+
+const cmdRegx = (Object.keys(botCmds) as (ChatStates['type'] | '/cancel')[])
+    .map((cmd) => ({ cmd, regx: `^${cmd}(${bot.username})?$` }));
 
 // --- // ChatState // --- //
 const chatStates = new Map<string, ChatStates>();
@@ -114,6 +139,15 @@ bot.getBot().on('message', (msg) =>
     }
 });
 
+bot.getBot().on('location', (msg) =>
+{
+    const from = vldtUser(msg);
+    if (!from || from.isBot) return;
+    
+    chatStateHandler({ ...from, type: '/set_timezone', step: timeZoneStep.TIMEZONE }, msg);
+});
+
+
 // State msg handler
 function chatStateHandler(state: ChatStates, msg: TelegramBot.Message): any
 {
@@ -135,12 +169,104 @@ function chatStateHandler(state: ChatStates, msg: TelegramBot.Message): any
             return urlDeleteHandler(state, text);
         case '/set_timezone':
             return timeZoneHandler(state, msg);
+        case '/set_day_start':
+            return setDayStartHandler(state, text);
+        case '/set_day_end':
+            return setDayEndHandler(state, text);
+        case '/chat_info':
+            return chatInfoHandler(state);
         default:
             // this should never happen
             const errMsg = `ERROR: Unhandled ChatState type: ${(state as any).type}`;
             bot.sendMsg(chatId, errMsg);
             log(new Error(errMsg));
             if (env.isDev) debugger;
+    }
+}
+
+// --- // ChatState Handlers // --- //
+function chatInfoHandler(state: ChatInfoState): any
+{
+    const { chatId } = state;
+
+    switch (state.step)
+    {
+        case chatInfoStep.INIT:
+            const chat = chats.get(chatId);
+            if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
+            const { timeZone, dayStart, dayEnd } = chat;
+            const dayStartStr = dayStart ? `${toStrHhMm(dayStart)}` : 'Not set';
+            const dayEndStr = dayEnd ? `${toStrHhMm(dayEnd)}` : 'Not set';
+            const dayStartMsg = chat.dayStartMsg || 'Not set';
+            const dayEndMsg = chat.dayEndMsg || 'Not set';
+
+            const msg = ''
+                + `\nTimezone: "${timeZone}"\n`
+                + `\nDay Start: ${dayStartStr}`
+                + `\nDay End: ${dayEndStr}\n`
+                + `\nDay Start Msg: \n"${dayStartMsg}"\n`
+                + `\nDay End Msg: \n"${dayEndMsg}"\n`;
+
+            chatStates.delete(chatId);
+            return bot.sendMsg(chatId, msg);
+        default: unhandledCommand(state, chatId);
+
+    }
+}
+
+function setDayEndHandler(state: SetDayEndState, text: string): any
+{
+    const { chatId, step } = state;
+
+    switch (step)
+    {
+        case setDayEndStep.INIT:
+            state.step!++;
+            return bot.sendMsg(chatId,
+                'Please enter the time to end your day (HH:MM)\n\nExamples:'
+                + '\n19:30'
+                + '\n7:30pm');
+        case setDayEndStep.TIME:
+            const time = parseHhMm(text);
+            if (!time) return bot.sendMsg(chatId, 'Invalid time format.\nPlease try again');
+
+            const chat = chats.get(chatId);
+            if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
+
+            chat.dayEnd = time;
+            chats.set(chatId, chat);
+
+            chatStates.delete(chatId);
+            return bot.sendMsg(chatId, `Your "day end" time is now set to ${time[0]}:${time[1]}`);
+        default: unhandledCommand(state, chatId);
+    }
+}
+
+function setDayStartHandler(state: SetDayStartState, text: string): any
+{
+    const { chatId, step } = state;
+
+    switch (step)
+    {
+        case setDayStartStep.INIT:
+            state.step!++;
+            return bot.sendMsg(chatId,
+                'Please enter the time to start your day (HH:MM)\n\nExamples:'
+                + '\n15:30'
+                + '\n3:30pm');
+        case setDayStartStep.TIME:
+            const time = parseHhMm(text);
+            if (!time) return bot.sendMsg(chatId, 'Invalid time format.\nPlease try again');
+
+            const chat = chats.get(chatId);
+            if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
+
+            chat.dayStart = time;
+            chats.set(chatId, chat);
+
+            chatStates.delete(chatId);
+            return bot.sendMsg(chatId, `Your "day start" is set to: "${time[0]}:${time[1]}"`);
+        default: unhandledCommand(state, chatId);
     }
 }
 
@@ -165,12 +291,7 @@ function timeZoneHandler(state: TimeZoneState, msg: TelegramBot.Message): any
 
             chatStates.delete(chatId);
             return bot.sendMsg(chatId, `Your timezone is set to: "${timeZone}"`);
-        default:
-            // this should never happen
-            const errMsg = `Unhandled timeZoneStep: ${(state as any).step}`;
-            bot.sendMsg(chatId, errMsg);
-            log(new Error(errMsg));
-            if (env.isDev) debugger;
+        default: unhandledCommand(state, chatId);
     }
 }
 
@@ -193,12 +314,7 @@ function urlsHandler(state: UrlListState): any
             // Confirmation message
             bot.sendMsg(chatId, '[📶 Upwork Feeds]:\n\n' + msgText)
             return chatStates.delete(chatId);
-        default:
-            // this should never happen
-            const errMsg = `Unhandled urlListStep: ${(state as any).step}`;
-            bot.sendMsg(chatId, errMsg);
-            log(new Error(errMsg));
-            if (env.isDev) debugger;
+        default: unhandledCommand(state, chatId);
     }
 }
 
@@ -246,12 +362,7 @@ function urlDeleteHandler(state: UrlDeleteState, text: string): any
             bot.sendMsg(chatId, `Deleted Feed: ${feed.name}`);
             return chatStates.delete(state.chatId);
         }
-        default:
-            // this should never happen
-            const errMsg = `Unhandled urlDeleteStep: ${(state as any).step}`;
-            bot.sendMsg(chatId, errMsg);
-            log(new Error(errMsg));
-            if (env.isDev) debugger;
+        default: unhandledCommand(state, chatId);
     }
 }
 
@@ -309,13 +420,20 @@ function urlAddHandler(state: UrlAddState, text: string): any
             // Confirmation message
             bot.sendMsg(chatId, `Added [📶]:\nName: "${text}"\nURL: ${state.rssUrl}`);
             return chatStates.delete(chatId);
-        default:
-            // this should never happen
-            const errMsg = `Unhandled urlAddStep: ${(state as any).step}`;
-            bot.sendMsg(chatId, errMsg);
-            log(new Error(errMsg));
-            if (env.isDev) debugger;
+        default: unhandledCommand(state, chatId);
+            
     }
+}
+
+// -- // Unhandled Commands // -- //
+function unhandledCommand(state: ChatStates, chatId: string): any
+{
+    // this should never happen
+    const errMsg = `Unhandled ChatState: ${(state as any).step}`;
+    bot.sendMsg(chatId, errMsg);
+    log(new Error(errMsg));
+    log(state);
+    if (env.isDev) debugger;
 }
 
 // --- // COMMANDS // --- //
@@ -350,7 +468,9 @@ bot.getBot().onText(new RegExp(`^/start(${bot.username})?$`, 'i'), (msg) =>
     if (!chat)
     {
         chats.set(from.chatId, genChat({ type, active: true }));
-        bot.sendMsg(from.chatId, `Welcome! I am ready to find jobs for you!\n\nUse /add_url to add a new feed.`);
+        bot.sendMsg(from.chatId, `Welcome! I am ready to find jobs for you!\n`
+            + `\n  - Share your location to set your timezone.` +
+            + `\n  - Use /add_url to add a new feed.`);
     }
     else
     {

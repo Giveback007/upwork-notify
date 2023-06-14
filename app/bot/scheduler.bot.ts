@@ -1,4 +1,4 @@
-import { wait } from "../utils/utils";
+import { wait } from "../utils/time.utils";
 
 type QuePromise<T> = {
     promise: Promise<{ ok: true; out: T; } | { ok: false; out: any }>;

@@ -12,7 +12,8 @@ import './init';
 
 // -- Imports -- //
 import { bot, chats } from './store/store';
-import { CronJob } from 'cron';
+import { writeFile } from './utils/utils';
+import { botCmds } from './bot/commands.bot';
 // import { getFeed } from './utils/feed.utils';
 // import { arrToRecord, getTime, msToTime, storeFeedItems, time } from './utils/utils';
 // import { generateMessage } from './utils/msg.utils';
@@ -22,6 +23,12 @@ import { CronJob } from 'cron';
 // -- App Start -- //
 setTimeout(async () => {
     try {
+        // Write the commands to a file to share with "BotFather"
+        writeFile('../bot-commands', Object.entries(botCmds).reduce((acc, [cmd, description]) => {
+            acc += `${cmd.slice(1)} - ${description}\n`;
+            return acc;
+        }, ''));
+
         bot.start().then(() => log('[*] BOT INITIALIZED'));
         console.log('[1]: BOT STARTING...');
 

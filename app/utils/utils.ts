@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ZodSchema, z } from 'zod';
+import { time } from './time.utils';
 
 export const genFeed =
 ({
@@ -69,17 +70,6 @@ export const handleZod = <T extends ZodSchema>(zSchema: T, data: any) =>
     }
 }
 
-export const time =
-{
-    sec: (s: number) => s * 1000,
-    min: (m: number) => m * 60000,
-    hrs: (h: number) => h * 3600000,
-    day: (d: number) => d * 86400000,
-}
-
-export const wait = (ms: number) =>
-    new Promise(r => setTimeout(r, ms));
-
 export const writeFile = (pth: string, data: string) =>
 {
     const pathToFile = joinMain(pth);
@@ -123,24 +113,6 @@ export function idsToRecord(arr: string[])
 
     return rec;
 }
-
-export function msToTime(msT: number)
-{
-    const ms = (msT % 1000);
-    let s = Math.floor(msT / 1000);
-    let m = Math.floor(s / 60);
-    s = s % 60;
-
-    let h = Math.floor(m / 60);
-    m = m % 60;
-
-    const d = Math.floor(h / 24);
-    h = h % 24;
-
-    return { d, h, m, s, ms };
-}
-
-export const getTime = (date: string | number | Date) => new Date(date).getTime();
 
 export const arrLast = <T>(arr: T[]) => arr[arr.length - 1];
 

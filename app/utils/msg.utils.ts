@@ -1,4 +1,4 @@
-import { msToTime, time } from "./utils";
+import { msToTime, time } from "./time.utils";
 
 const map = {
     'Country': '[🌎]: ',

@@ -3,6 +3,7 @@ import { readState, writeState } from "./read-write.store";
 import { Bot } from "../bot/bot";
 import { MapState } from "./map-state.store";
 import { State } from "./state.store";
+import { CronJob, CronTime } from "cron";
 
 
 // -/-/- // -- appState -- // -/-/- //
@@ -28,6 +29,65 @@ Object.keys(appState).forEach((key) => {
 export const bot = new Bot(env.bot.token, env.bot.username);
 
 // -/-/- // -- dayStartEndMsgs -- // -/-/- //
-export const dayStartEndMsgs = {
+type ChatCron = { dayStart?: CronJob; dayEnd?: CronJob; };
+const dayStartEndMsgs: { [chatId: string]: ChatCron } = {}
 
+function updateCronJobs(chatId: string, chat: Chat)
+{
+    const { active, dayEnd, dayStart, dayEndMsg, dayStartMsg, timeZone } = chat;
+    const chatCron: ChatCron = dayStartEndMsgs[chatId] = dayStartEndMsgs[chatId] || {};
+
+    // If dayStart time is defined
+    if (dayStart)
+    {
+        const [hour, minute] = dayStart;
+        const cronTime = `${minute} ${hour} * * *`;
+
+        if (chatCron.dayStart)
+        {
+            const cronJob = chatCron.dayStart;
+            cronJob.setTime(new CronTime(cronTime, timeZone));
+
+            if (active) cronJob.start();
+            else cronJob.stop();
+        }
+        else
+        {
+            const newCronJob = new CronJob(cronTime, () =>
+            {
+                bot.sendMsg(chatId, '🌅');
+                if (dayStartMsg) bot.sendMsg(chatId, dayStartMsg);
+            }, null, active, timeZone);
+
+            chatCron.dayStart = newCronJob;
+        }
+    }
+
+    // Similar for dayEnd
+    if (dayEnd)
+    {
+        const [hour, minute] = dayEnd;
+        const cronTime = `${minute} ${hour} * * *`;
+
+        if (chatCron.dayEnd)
+        {
+            const cronJob = chatCron.dayEnd;
+            cronJob.setTime(new CronTime(cronTime, timeZone));
+
+            if (active) cronJob.start();
+            else cronJob.stop();
+        }
+        else
+        {
+            const newCronJob = new CronJob(cronTime, () =>
+            {
+                bot.sendMsg(chatId, '🌌');
+                if (dayEndMsg) bot.sendMsg(chatId, dayEndMsg);
+            }, null, active, timeZone);
+
+            chatCron.dayEnd = newCronJob;
+        }
+    }
 }
+
+chats.forEach((chat, chatId) => updateCronJobs(chatId, chat));
