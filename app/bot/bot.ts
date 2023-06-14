@@ -1,8 +1,9 @@
-import TelegramBot, { Message } from 'node-telegram-bot-api';
+import TelegramBot from 'node-telegram-bot-api';
 import { splitUpString } from '../utils/string.utils';
 import { feedItems, jobMsgs } from '../store/store';
 import { generateMessage } from '../utils/msg.utils';
 import { Scheduler } from './scheduler.bot';
+import { users } from '../store/store';
 
 
 const addPartInfo = (msg: string) => splitUpString(msg, 4060)
@@ -13,8 +14,24 @@ const addEllipsis = (msg: string) => msg.slice(0, 4093) + '...';
 const toSplitMsgs = (msg: string) => msg.length > 4096 ? addPartInfo(msg) : [msg];
 
 // https://t.me/${env.BOT_USERNAME}
-export class Bot extends TelegramBot {
+export class Bot {
     private scheduler = new Scheduler();
+    private bot: TelegramBot;
+    
+    get username() {
+        return this._botUsername;
+    }
+
+    constructor(
+        apiKey: string,
+        private _botUsername: string,
+    ) {
+        this.bot = new TelegramBot(apiKey, { polling: true });
+    }
+
+    getBot() {
+        return this.bot;
+    }
 
     /**
      * If the msg is too long it will be split into multiple msgs,
@@ -22,7 +39,7 @@ export class Bot extends TelegramBot {
     sendMsg = async (chatId: string, msg: string) =>
     {
         const promises = toSplitMsgs(msg).map(async msg =>
-            this.scheduler.toQue(chatId, () => this.sendMessage(chatId, msg, {
+            this.scheduler.toQue(chatId, () => this.bot.sendMessage(chatId, msg, {
                 disable_web_page_preview: true,
             }))
         );
@@ -79,7 +96,7 @@ export class Bot extends TelegramBot {
 
     sendImg = async (chatId: string, imgPath: string) =>
     {
-        return this.scheduler.toQue(chatId, () => this.sendPhoto(chatId, imgPath));
+        return this.scheduler.toQue(chatId, () => this.bot.sendPhoto(chatId, imgPath));
     }
 
     update = async (chatId: string, msgId: string, updateMsg: string) =>
@@ -87,7 +104,7 @@ export class Bot extends TelegramBot {
         const jobMsg = jobMsgs.get(this.genMsgId(chatId, msgId));
         if (!jobMsg) return log(`No message found with id ${msgId}`);
 
-        return this.scheduler.toQue(chatId, () => this.editMessageText(updateMsg, {
+        return this.scheduler.toQue(chatId, () => this.bot.editMessageText(updateMsg, {
             chat_id: chatId,
             message_id: Number(jobMsg.msgId),
             disable_web_page_preview: true
@@ -96,19 +113,11 @@ export class Bot extends TelegramBot {
 
     genMsgId = (chatId: string | number, msgId: string | number) => `${chatId}-${msgId}`;
 
-    // a method for validating the chatId (if the user or group is allowed to use the bot)
-    validateChatId = (chatId: string | number) =>
+    validateUser = (from?: TelegramBot.User) =>
     {
-        chatId = chatId.toString();
-        const chat = env.chats.find(({ id }) => id.toString() === chatId);
-
-        return !!chat;
-    }
-
-    validateUser = (from: TelegramBot.User) =>
-    {
+        if (!from) return false;
         const userId = from.id.toString();
-        const user = env.users.find(({ id }) => id.toString() === userId);
+        const user = users.get(userId);
 
         return !!user;
     }

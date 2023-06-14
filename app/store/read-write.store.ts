@@ -48,10 +48,11 @@ export function readState(): AppState {
     
     const appState: AppState = {
         _v: stateVersion,
-        chats: new MapState(useWS ? writtenState.chats._v : null),
+        chats: new MapState(useWS ? writtenState.chats._v : env.chats),
         feeds: new MapState(useWS ? writtenState.feeds._v : null),
         jobMsgs: new MapState(useWS ? writtenState.jobMsgs._v : null),
         feedItems: new MapState(useWS ? writtenState.feedItems._v : null),
+        users: new MapState(useWS ? writtenState.users._v : env.users),
     };
 
     Object.keys(appState).forEach((key) => {

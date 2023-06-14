@@ -8,7 +8,8 @@ export const {
     chats,
     jobMsgs,
     feedItems,
+    users,
 }: AppState = readState();
 
 // -/-/- // -- bot -- // -/-/- //
-export const bot = new Bot(env.bot.token);
+export const bot = new Bot(env.bot.token, env.bot.username);

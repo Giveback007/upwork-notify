@@ -2,14 +2,8 @@ import { MapState } from "./map-state.store";
 
 export type AppState = {
     _v: 3;
-    chats: MapState<string, {
-        feedIds: string[];
-        dayStart: number;
-        dayEnd: number;
-        type: "private" | "group";
-        /** A flag to indicate if the user /start the bot */
-        started: boolean;
-    }>;
+    chats: MapState<string, Chat>;
+    users: MapState<string, User>;
     /** The hash id is generated with the feed Atom Link */
     feeds: MapState<string, Feed>;
     /** Msgs that the bot sent */

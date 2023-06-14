@@ -11,7 +11,7 @@
 import './init';
 
 // -- Imports -- //
-// import { feeds as feedsState, feedParams, bot, feedItems, jobMsgs } from './store';
+import { bot } from './store/store';
 // import { getFeed } from './utils/feed.utils';
 // import { arrToRecord, getTime, msToTime, storeFeedItems, time } from './utils/utils';
 // import { generateMessage } from './utils/msg.utils';
@@ -32,8 +32,18 @@ setTimeout(async () => {
         // await import('./bot/commands.bot');
         // console.log('[4]: COMMANDS INITIALIZED');
 
-        // bot.send({ msg: '💻' });
-        // bot.send({ msg: env.START_MSG });
+        const users = env.isDev ? [env.devUser] : env.users.filter(({ active }) => active);
+        const chats = env.isDev ? [] : env.chats.filter(({ active }) => active);
+
+        [...users, ...chats].forEach((obj) => {
+            if (!obj.active) return;
+            const { _t: t } = obj;
+
+            
+        });
+
+        bot.sendMsg('💻');
+        bot.send({ msg: env.START_MSG });
         console.log('[Final]: APP INITIALIZED');
     } catch(error) {
         // bot.sendError(error);

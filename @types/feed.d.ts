@@ -8,13 +8,13 @@ type FeedParams = {
     name: string;
     /** id of user who added the url */
     userId: string;
-    /** How many items to return from the feed (when pulled online from rss/atom) */
-    feedItemCount: 10 | 20 | 50 | 100;
     /** At which point to stop updating the job-msg */
-    maxJobAge: number;
+    maxJobUpdateAge?: number;
+    /** How many items to return from the feed (when pulled online from rss/atom) */
+    feedItemCount?: 10 | 20 | 50 | 100;
 
     checkFreq?: number;
-    items?: string[];
+    itemIds?: string[];
     lastChecked?: number;
 };
 

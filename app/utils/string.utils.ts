@@ -1,11 +1,5 @@
 import crypto from 'crypto';
 
-export const uuid = () =>
-    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-
 export function insertAt(str: string, index: number, insert: string) {
     return str.slice(0, index) + insert + str.slice(index);
 }
@@ -38,6 +32,7 @@ export function splitUpString(str: string, maxLen: number) {
 export function hashString(input: string, type: HashType = 'sha256'): string {
     const hash = crypto.createHash(type);
     hash.update(input);
+    
     return hash.digest('hex');
 }
 

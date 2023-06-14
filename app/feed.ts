@@ -1,18 +1,23 @@
 import fetch from "node-fetch";
 import * as xml2js from 'xml2js';
-import { handleZod, readJSON, writeJSON } from "./utils/utils";
+import { handleZod, idsToRecord, readJSON, writeJSON } from "./utils/utils";
 import { hashString, replaceHtmlEntities, splitAt } from "./utils/string.utils";
 import { atomFeedToJSONSchema } from "./schemas/atom-to-json.schema";
 import { feedItemSchema } from "./schemas/feed-item.schema";
 import { isType } from "./utils/test.utils";
-import { feeds } from "./store/store";
+import { feedItems, feeds } from "./store/store";
 
-export const genFeed = ({ items, lastChecked, checkFreq, ...rest }: FeedParams): Feed => ({
-    items: items ?? [],
-    lastChecked: lastChecked ?? 0,
-    checkFreq: checkFreq ?? 0,
-    ...rest,
-});
+export function storeFeedItems(feedId: string, feed: Feed) {
+    const filePath = `../data/feeds/${feedId}.json`;
+
+    const items = readJSON<Record<string, FeedItem>>(filePath) || {};
+    feed.itemIds.map((id) => feedItems.get(id)).forEach((item) => {
+        if (!item) return;
+        items[item.linkHref] = item;
+    });
+
+    writeJSON(filePath, items);
+}
 
 // https://www.upwork.com/ab/feed/jobs/atom?q=javascript&user_location_match=1&sort=recency&paging=0%3B10&api_params=1&securityToken=b8e9762da3383da88fdab543aaf25418ab321582509f154a4c322e49a5bc293e95645f9f157483f64618af05227ddb546a700cc96a3dae3177e3066c0c67d612&userUid=1057152582708793344&orgUid=1057152582717181953
 export async function getFeed(atomUrl: string, num: Feed['feedItemCount'] = 20) {
@@ -37,11 +42,16 @@ export async function getFeed(atomUrl: string, num: Feed['feedItemCount'] = 20) 
             writeJSON(xmlPath, xml);
         
         const json = await xmlToJSON(xml);
-        if (!json) bot.send({ msg: 'Failed to parse get feed from link' });
+        if (!json) {
+            log('Failed to parse get feed from link')
+            if (env.isDev) debugger;
+        }
         
         return json;
     } catch (error) {
-        bot.sendError(error);
+        log(error);
+        if (env.isDev) debugger;
+
         return null;
     }
 }
@@ -83,7 +93,7 @@ export async function xmlToJSON(xml: string) {
 
         const zOut = handleZod(feedItemSchema, item);
         if (zOut.type === 'ERROR' || zOut.type === 'ZOD_ERROR') {
-            bot.sendError(new Error('FeedItem validation failed'))
+            if (env.isDev) debugger;
             log(zOut.error);
             return;
         }
@@ -111,7 +121,7 @@ export function parseContent(content: string) {
     
     // Separate the main content from the rest
     const [mainContent = '', remainingContent = ''] = splitAt(content, breakIdx);
-    if (!mainContent || !remainingContent) bot.sendError(new Error('mainContent or remainingContent is null'));
+    if (env.isDev && (!mainContent || !remainingContent)) debugger; 
 
     const pairs = remainingContent.split('<br />');
 
@@ -128,22 +138,25 @@ export function parseContent(content: string) {
 }
 
 type FeedFilters = { userId?: string, chatId?: string, feedIds?: string[] };
-export function filterFeeds(filters: FeedFilters): Feed[];
-export function filterFeeds(filters: FeedFilters, getIds: false): Feed[];
+export function filterFeeds(filters: FeedFilters): [string, Feed][];
+export function filterFeeds(filters: FeedFilters, getIds: false): [string, Feed][];
 export function filterFeeds(filters: FeedFilters, getIds: true): string[];
-export function filterFeeds(filters: FeedFilters, getIds: boolean = false): Feed[] | string[] {
+export function filterFeeds(filters: FeedFilters, getIds: boolean = false): [string, Feed][] | string[] {
     const { userId, chatId, feedIds } = filters;
-    
-    const filteredFeeds = Array.from(feeds).filter(([feedHashId, fd]) => {
-        if (feedIds && !feedIds.includes(feedHashId))   return false;
-        if (userId  && fd.userId !== userId)            return false;
-        if (chatId  && fd.chatId !== chatId)            return false;
-        
-        return true;
+    const filteredFeeds: [string, Required<FeedParams>][] = [];
+    const rec = feedIds ? idsToRecord(feedIds) : null;
+
+    let idx = 0;
+    feeds.forEach((feed, id) => {
+        if (rec && !rec[id]) return;
+        if (userId && feed.userId !== userId) return;
+        if (chatId && feed.chatId !== chatId) return;
+
+        filteredFeeds[idx] = [id, feed];
     });
 
     return getIds ?
         filteredFeeds.map(([id]) => id)
         :
-        filteredFeeds.map(([,feed]) => feed as any as Feed);
+        filteredFeeds;
 }

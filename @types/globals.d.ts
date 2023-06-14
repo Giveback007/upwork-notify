@@ -1,3 +1,10 @@
+type User = {
+    username: string;
+    roles: Partial<{
+        dev: boolean;
+    }>;
+}
+
 type ENV = {
     env: 'dev' | 'prod';
     bots: {
@@ -6,16 +13,9 @@ type ENV = {
         token: string;
         env: 'dev' | 'prod';
     }[];
-    users: {
-        username: string;
-        id: number | string;
-        startMsg: string;
-    }[];
-    chats: {
-        id: number | string;
-        startMsg: string;
-        type: 'group' | 'private';
-    }[];
+    devUser: User;
+    users: [string, User][];
+    chats: [string, Chat][];
 }
 
 declare const env: ENV & { isDev: boolean, bot: ENV['bots'][0] };
