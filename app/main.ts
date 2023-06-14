@@ -11,16 +11,19 @@
 import './init';
 
 // -- Imports -- //
-import { bot } from './store/store';
+import { bot, chats } from './store/store';
+import { CronJob } from 'cron';
 // import { getFeed } from './utils/feed.utils';
 // import { arrToRecord, getTime, msToTime, storeFeedItems, time } from './utils/utils';
 // import { generateMessage } from './utils/msg.utils';
 
+// log(cleanStack());
+
 // -- App Start -- //
 setTimeout(async () => {
     try {
-        // bot.start();
-        // console.log('[1]: BOT STARTED');
+        bot.start().then(() => log('[*] BOT INITIALIZED'));
+        console.log('[1]: BOT STARTING...');
 
         // checkFeeds();
         // console.log('[2]: FEED CHECKER STARTED');
@@ -29,24 +32,26 @@ setTimeout(async () => {
         // console.log('[3]: MSG TIMES-UPDATER STARTED');
 
         // async import the commands
-        // await import('./bot/commands.bot');
-        // console.log('[4]: COMMANDS INITIALIZED');
+        await import('./bot/commands.bot');
+        console.log('[4]: COMMANDS INITIALIZED');
 
-        const users = env.isDev ? [env.devUser] : env.users.filter(({ active }) => active);
-        const chats = env.isDev ? [] : env.chats.filter(({ active }) => active);
+        
+        chats.forEach((chat, chatId) => {
+            // log(chatId, chat)
+            // const { dayStart, dayEnd, timeZone } = chat;
+            // bot.sendMsg(chatId, '💻');
 
-        [...users, ...chats].forEach((obj) => {
-            if (!obj.active) return;
-            const { _t: t } = obj;
+            // if (dayStart) new CronJob(`${dayStart[1]} ${dayStart[0]} * * *`, () => {
 
-            
+            // }, null, false, timeZone);
+
+            // if (dayEnd) new CronJob(`${dayEnd[1]} ${dayEnd[0]} * * *`, () => {
+                    
+            // });
         });
 
-        bot.sendMsg('💻');
-        bot.send({ msg: env.START_MSG });
         console.log('[Final]: APP INITIALIZED');
     } catch(error) {
-        // bot.sendError(error);
         log(error);
     }
 });

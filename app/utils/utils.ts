@@ -26,7 +26,9 @@ export const genChat =
     dayEnd,
     dayStart,
     dayStartMsg,
+    dayEndMsg,
     feedIds,
+    timeZone,
     ...rest
 }: ChatParams): Chat =>
 ({
@@ -34,7 +36,9 @@ export const genChat =
     dayEnd: dayEnd ?? [20, 30],
     dayStart: dayStart ?? [8, 0],
     dayStartMsg: dayStartMsg ?? null,
+    dayEndMsg: dayEndMsg ?? null,
     feedIds: feedIds ?? [],
+    timeZone: timeZone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
     ...rest,
 });
 
@@ -75,9 +79,6 @@ export const time =
 
 export const wait = (ms: number) =>
     new Promise(r => setTimeout(r, ms));
-
-export const joinMain = (filePath: string) =>
-    path.join(mainFileDirectory, filePath);
 
 export const writeFile = (pth: string, data: string) =>
 {
@@ -142,3 +143,17 @@ export function msToTime(msT: number)
 export const getTime = (date: string | number | Date) => new Date(date).getTime();
 
 export const arrLast = <T>(arr: T[]) => arr[arr.length - 1];
+
+export const objKeyCheck = <T extends AnyObj>(obj: T, keyObj: { [key in keyof T]: any }) =>
+{
+    const missingKeys: string[] = [];
+    for (const key in keyObj)
+    {
+        if (obj[key] === undefined) missingKeys.push(key);
+    }
+
+    return missingKeys.length ?
+        { ok: false, missingKeys } as const
+        :
+        { ok: true, val: obj, } as const;
+}

@@ -34,7 +34,7 @@ export const isType = <T extends JsType> (
 export function type(val: any): JsType {
     if (val === null) return 'null';
     if (Array.isArray(val)) return 'array';
-    if (val !== val) return 'NaN';
+    if (Number.isNaN(val)) return 'NaN';
     if (val instanceof Date) return 'Date';
     if (val instanceof Map) return 'Map';
     if (val instanceof Set) return 'Set';

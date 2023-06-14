@@ -86,10 +86,10 @@ export class MapState<K extends string | number, V> extends EventEmitter {
     toEntryArr = () => Array.from(this.map);
 
     // @ts-ignore
-    override on = (event: "change", listener: (change: MapStateActions<K, V>) => void) => {
+    override on = (event: "change", listener: (changeHistory: MapStateActions<K, V>[]) => void) => {
         if (event !== "change")
             log(new Error(`Unsupported event type: ${event}`));
-        else 
+        else
             // @ts-ignore
             super.on(event, listener);
 
@@ -108,18 +108,18 @@ export class MapState<K extends string | number, V> extends EventEmitter {
     }
 
     private changeTimeout: NodeJS.Timeout | null = null;
-    private lastChange: MapStateActions<K, V> | null = null;
+    private changeHistory: MapStateActions<K, V>[] = [];
     private scheduleEmitter(change: MapStateActions<K, V>) {
-        this.lastChange = change;
+        this.changeHistory.push(change);
         if (this.changeTimeout)
             clearTimeout(this.changeTimeout);
             
         this.changeTimeout = setTimeout(() => {
-            if (this.lastChange) {
-                this.emit('change', this.lastChange);
-            }
+            if (this.changeHistory.length)
+                this.emit('change', this.changeHistory);
+        
+            this.changeHistory = [];
             this.changeTimeout = null;
-            this.lastChange = null;
         }, 0);
     }
 }

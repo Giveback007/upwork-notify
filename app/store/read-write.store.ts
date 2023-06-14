@@ -1,4 +1,4 @@
-import { readJSON, writeJSON } from "../utils/utils";
+import { objKeyCheck, readJSON, writeJSON } from "../utils/utils";
 import { MapState } from "./map-state.store";
 import { State } from "./state.store";
 import { stateParams } from "./store.params";
@@ -14,7 +14,7 @@ type WritableState<T> = {
 
 type WrittenState = WritableState<AppState>;
 
-export async function writeState(update: Partial<AppState>) {
+export function writeState(update: Partial<AppState>) {
     type K = keyof AppState;
 
     const oldState: WrittenState = readJSON(stateParams.statePath) || {} as any;
@@ -24,15 +24,19 @@ export async function writeState(update: Partial<AppState>) {
         const val: any = update[key as K];
         
         if (val instanceof MapState) {
-            newState[key as K] = { t: 'MapState', v: val.toEntryArr() } as any;
+            newState[key as K] = { _t: 'MapState', _v: val.toEntryArr() } as any;
         } else if (val instanceof State) {
-            newState[key as K] = { t: 'State', v: val.get() } as any;
+            newState[key as K] = { _t: 'State', _v: val.get() } as any;
         } else {
-            newState[key as K] = val;
+            newState[key as K] = { _t: 'any', _v: val } as any;
         }
     }
 
-    writeJSON(stateParams.statePath, { ...oldState, ...newState });
+    const { ok, missingKeys, val } = objKeyCheck({ ...oldState, ...newState }, { _v: '', chats: '', feeds: '', jobMsgs: '', feedItems: '', users: '' });
+    if (!ok)
+        throw new Error(`Missing keys in state: [${missingKeys.join(', ')}]`);
+
+    writeJSON(stateParams.statePath, val);
 }
 
 /**
@@ -43,23 +47,17 @@ export async function writeState(update: Partial<AppState>) {
 export function readState(): AppState {
     const { stateVersion, statePath } = stateParams;
 
-    const writtenState = readJSON<WrittenState>(statePath);
-    const useWS = writtenState && writtenState._v._v === stateVersion;
+    const ws = readJSON<WrittenState>(statePath);
+    const useWS = ws && ws._v._v === stateVersion;
     
     const appState: AppState = {
         _v: stateVersion,
-        chats: new MapState(useWS ? writtenState.chats._v : env.chats),
-        feeds: new MapState(useWS ? writtenState.feeds._v : null),
-        jobMsgs: new MapState(useWS ? writtenState.jobMsgs._v : null),
-        feedItems: new MapState(useWS ? writtenState.feedItems._v : null),
-        users: new MapState(useWS ? writtenState.users._v : env.users),
+        chats: new MapState(useWS ? ws.chats._v : env.chats),
+        feeds: new MapState(useWS ? ws.feeds._v : null),
+        jobMsgs: new MapState(useWS ? ws.jobMsgs._v : null),
+        feedItems: new MapState(useWS ? ws.feedItems._v : null),
+        users: new MapState(useWS ? ws.users._v : env.users),
     };
-
-    Object.keys(appState).forEach((key) => {
-        const item = (appState as any)[key];
-        if (item instanceof MapState)
-            item.on('change', () => writeState({ [key]: item }));
-    });
 
     return appState;
 }

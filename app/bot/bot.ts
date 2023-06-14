@@ -24,10 +24,17 @@ export class Bot {
 
     constructor(
         apiKey: string,
+        /** Make sure to provide the full username with the "@" at the beginning */
         private _botUsername: string,
     ) {
-        this.bot = new TelegramBot(apiKey, { polling: true });
+        this.bot = new TelegramBot(apiKey);
+
+        if (this._botUsername[0] !== '@')
+            this._botUsername = '@' + this._botUsername;
     }
+
+    start = () => this.bot.startPolling();
+    stop = () => this.bot.stopPolling();
 
     getBot() {
         return this.bot;

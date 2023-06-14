@@ -1,9 +1,10 @@
-import { genChat, genFeed, handleZod, joinMain, time } from "../utils/utils";
+import { genChat, genFeed, handleZod, time } from "../utils/utils";
 import { bot, chats, feeds } from "../store/store";
 import { feedItemParamsSchema } from "../schemas/feed-item-params.schema";
-import { Message } from "node-telegram-bot-api";
+import TelegramBot, { Message } from "node-telegram-bot-api";
 import { filterFeeds } from "../feed";
 import { randomUUID as UUID } from 'crypto';
+import { find } from 'geo-tz';
 
 /*
 Commands:
@@ -13,13 +14,15 @@ cancel - Cancel the current command
 url_add - Add an Upwork url
 url_del - Delete an Upwork url
 urls - Get the list of urls
+set_timezone - Set the timezone
 */
 
 // --- // ChatStates Types // --- //
 type ChatStates =
     | UrlAddState
     | UrlDeleteState
-    | UrlListState;
+    | UrlListState
+    | TimeZoneState;
 
 type IChatState =
 {
@@ -53,6 +56,27 @@ type UrlListState = IChatState &
     step?: urlListStep;
 };
 
+enum timeZoneStep { INIT, TIMEZONE, }
+type TimeZoneState = IChatState &
+{
+    type: '/set_timezone';
+    step?: timeZoneStep;
+    timeZone?: string;
+};
+
+// -- // Command Lists // -- //
+const cmdList: (ChatStates['type'] | '/cancel')[] =
+[
+    '/url_add', '/urls', '/url_del', '/cancel',
+    '/set_timezone',
+    // '/set_day_start', '/set_day_end',
+    // '/set_start_msg', '/check_feed'
+]
+
+const cmdRegx = cmdList.map((cmd) => ({
+    cmd, regx: `^${cmd}(${bot.username})?$`
+}));
+
 // --- // ChatState // --- //
 const chatStates = new Map<string, ChatStates>();
 
@@ -64,7 +88,7 @@ setInterval(() =>
         if (now - state._updated! < time.min(3)) return;
 
         chatStates.delete(chatId);
-        bot.sendMsg(chatId, `Command: ${state.type} cancelled due to inactivity`);
+        bot.sendMsg(chatId, `Command: "${state.type}" cancelled due to inactivity`);
     });
 }, time.sec(15));
 
@@ -72,19 +96,28 @@ setInterval(() =>
 bot.getBot().on('message', (msg) =>
 {
     const from = vldtUser(msg);
-    if (!from) return;
+    if (!from || from.isBot) return;
 
-    const { chatId, isBot, userId } = from;
+    const { chatId, userId } = from;
     const state = chatStates.get(chatId);
+
+    // Check if command & exit if is
+    if (msg.text?.startsWith('/'))
+    {
+        const cmd = cmdRegx.find(({ regx }) => msg.text?.match(regx));
+        if (cmd) return;
+    }
     
-    if (!isBot && state && userId === state.userId) {
-        chatStateHandler(state, msg.text);
+    if (state && state.userId === userId)
+    {
+        chatStateHandler(state, msg);
     }
 });
 
 // State msg handler
-function chatStateHandler(state: ChatStates, text?: string | undefined): any
+function chatStateHandler(state: ChatStates, msg: TelegramBot.Message): any
 {
+    let { text } = msg;
     const { chatId } = state;
 
     state._updated = Date.now();
@@ -100,9 +133,41 @@ function chatStateHandler(state: ChatStates, text?: string | undefined): any
             return urlAddHandler(state, text);
         case '/url_del':
             return urlDeleteHandler(state, text);
+        case '/set_timezone':
+            return timeZoneHandler(state, msg);
         default:
             // this should never happen
             const errMsg = `ERROR: Unhandled ChatState type: ${(state as any).type}`;
+            bot.sendMsg(chatId, errMsg);
+            log(new Error(errMsg));
+            if (env.isDev) debugger;
+    }
+}
+
+function timeZoneHandler(state: TimeZoneState, msg: TelegramBot.Message): any
+{
+    const { chatId, step } = state;
+
+    switch (step)
+    {
+        case timeZoneStep.INIT:
+            state.step!++;
+            return bot.sendMsg(chatId, 'Please share your location');
+        case timeZoneStep.TIMEZONE:
+            if (!msg.location) return bot.sendMsg(chatId, 'Could not get your location.\nPlease share your location');
+            const [lat, lon] = [msg.location.latitude, msg.location.longitude];
+            const [timeZone] = find(lat, lon);
+
+            if (!timeZone)
+                return bot.sendMsg(chatId, 'Could not get your timezone.\nPlease try again.');
+
+            chats.set(chatId, { ...chats.get(chatId)!, timeZone });
+
+            chatStates.delete(chatId);
+            return bot.sendMsg(chatId, `Your timezone is set to: "${timeZone}"`);
+        default:
+            // this should never happen
+            const errMsg = `Unhandled timeZoneStep: ${(state as any).step}`;
             bot.sendMsg(chatId, errMsg);
             log(new Error(errMsg));
             if (env.isDev) debugger;
@@ -242,7 +307,7 @@ function urlAddHandler(state: UrlAddState, text: string): any
             feeds.set(UUID(), genFeed(data));
             
             // Confirmation message
-            bot.sendMsg(chatId, `Added [📶]: ${text}:\nName: ${text}\nURL: ${state.rssUrl}`);
+            bot.sendMsg(chatId, `Added [📶]:\nName: "${text}"\nURL: ${state.rssUrl}`);
             return chatStates.delete(chatId);
         default:
             // this should never happen
@@ -275,7 +340,7 @@ const vldtUser = (msg: Message) =>
     return { chatId, userId: from.id.toString(), isBot: from.is_bot };
 }
 
-bot.getBot().onText(new RegExp(`^/start(@${bot.username})?$`, 'i'), (msg) =>
+bot.getBot().onText(new RegExp(`^/start(${bot.username})?$`, 'i'), (msg) =>
 {
     const from = vldtUser(msg);
     if (!from) return;
@@ -299,7 +364,7 @@ bot.getBot().onText(new RegExp(`^/start(@${bot.username})?$`, 'i'), (msg) =>
     }
 });
 
-bot.getBot().onText(new RegExp(`^/stop(@${bot.username})?$`, 'i'), (msg) =>
+bot.getBot().onText(new RegExp(`^/stop(${bot.username})?$`, 'i'), (msg) =>
 {
     const from = vldtUser(msg);
     if (!from) return;
@@ -317,15 +382,9 @@ bot.getBot().onText(new RegExp(`^/stop(@${bot.username})?$`, 'i'), (msg) =>
     }
 });
 
-const commands: (ChatStates['type'] | '/cancel')[] =
-[
-    '/url_add', '/urls', '/url_del', '/cancel',
-    // '/set_day_start', '/set_day_end', '/set_time_zone',
-    // '/set_start_msg', '/check_feed'
-];
-commands.forEach((command) =>
+cmdRegx.forEach(({ cmd, regx }) =>
 {
-    bot.getBot().onText(new RegExp(`^${command}(@${bot.username})?$`, 'i'), (msg) =>
+    bot.getBot().onText(new RegExp(regx, 'i'), (msg) =>
     {
         const from = vldtUser(msg);
         if (!from) return;
@@ -336,10 +395,10 @@ commands.forEach((command) =>
         if (state)
         {
             chatStates.delete(chatId);
-            bot.sendMsg(chatId, `Cancel: "${state.type}"` + (command === '/cancel' ? '' : `\nStart: "${command}"`));
+            bot.sendMsg(chatId, `Canceling: "${state.type}"` + (cmd === '/cancel' ? '' : `\nStarting: "${cmd}"`));
         }
 
-        if (command === '/cancel') return;
-        chatStateHandler({ ...from, type: command });
+        if (cmd === '/cancel') return;
+        chatStateHandler({ ...from, type: cmd }, msg);
     });
 });
