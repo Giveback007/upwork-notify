@@ -16,6 +16,15 @@
             "name": "Attach to Process",
             "processId": "${command:PickProcess}",
             "restart": true,
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch '_scrap.ts' tsx",
+            "runtimeExecutable": "pnpm",
+            "runtimeArgs": [
+                "run-script",
+                "tsx-scrap"
+            ]
         }
     ]
 }

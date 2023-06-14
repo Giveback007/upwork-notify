@@ -1,15 +1,5 @@
 import { expect } from 'chai';
-import { cleanUpContent, parseContent } from '../app/utils/feed.utils';
-
-describe('cleanUpContent', () => {
-    it('should decode HTML entities', async () => {
-        const testString = `&amp; &lt; &gt; &apos; &quot; &nbsp; &copy; &uuml; &Uuml; &ndash; &mdash; &iexcl; &iquest; &ldquo; &rdquo; &lsquo; &rsquo; &laquo; &raquo; &bull; &hellip; &permil; &prime; &Prime; &lsaquo; &rsaquo; &oline; &frasl; &euro; &trade; &larr; &uarr; &rarr; &darr; &harr; &crarr; &lceil; &rceil; &lfloor; &rfloor; &loz; &clubs; &hearts; &diams; &spades;`;
-        const expectedString = `& < > ' "   © ü Ü – — ¡ ¿ “ ” ‘ ’ « » • … ‰ ′ ″ ‹ › ‾ ⁄ € ™ ← ↑ → ↓ ↔ ↵ ⌈ ⌉ ⌊ ⌋ ◊ ♣ ♥ ♦ ♠`;
-        const cleanString = cleanUpContent(testString);
-
-        expect(cleanString).to.equal(expectedString);
-    });
-});
+import { parseContent } from '../app/feed';
 
 describe('parseContent', () => {
     it('should parse content', async () => {

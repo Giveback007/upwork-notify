@@ -12,7 +12,9 @@
     "start:prod-ts": "pm2 start npx --name upn-ts -- tsx app/main.ts",
     "start:prod": "pm2 start npm --name upn-js --interpreter bash --interpreter-args '-c \"npm run run-build\"'",
     "run-build": "node --experimental-specifier-resolution=node ./dist/main.js",
-    "test": "tsx mocha.test.ts"
+    "test": "tsx mocha.test.ts",
+    "test:watch": "tsx watch mocha.test.ts",
+    "tsx-scrap": "tsx watch --inspect app/_scrap.ts"
   },
   "keywords": [],
   "author": "",
@@ -37,10 +39,12 @@
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.2.5",
     "@types/node-telegram-bot-api": "^0.61.6",
+    "@types/sinon": "^10.0.15",
     "@types/xml2js": "^0.4.11",
     "chai": "^4.3.7",
     "concurrently": "^8.1.0",
     "mocha": "^10.2.0",
+    "sinon": "^15.1.2",
     "tsx": "^3.12.7",
     "typescript": "^5.1.3"
   }

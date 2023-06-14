@@ -1,5 +1,6 @@
 import { AppState } from "./store.types";
 import { readState } from "./read-write.store";
+import { Bot } from "../bot/bot";
 
 
 export const {
@@ -9,5 +10,5 @@ export const {
     feedItems,
 }: AppState = readState();
 
-// // -/-/- // -- bot -- // -/-/- //
-// export const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
+// -/-/- // -- bot -- // -/-/- //
+export const bot = new Bot(env.bot.token);

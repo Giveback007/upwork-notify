@@ -100,3 +100,5 @@ export function msToTime(msT: number) {
 export function getTime(date: string | number | Date) {
     return new Date(date).getTime();
 }
+
+export const arrLast = <T>(arr: T[]) => arr[arr.length - 1];

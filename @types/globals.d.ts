@@ -4,6 +4,7 @@ type ENV = {
         name: string;
         username: string;
         token: string;
+        env: 'dev' | 'prod';
     }[];
     users: {
         username: string;
@@ -17,7 +18,7 @@ type ENV = {
     }[];
 }
 
-declare const env: ENV & { isDev: boolean };
+declare const env: ENV & { isDev: boolean, bot: ENV['bots'][0] };
 declare const mainFileDirectory: string;
 declare function log(...message: any[]): void
 

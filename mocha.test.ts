@@ -3,7 +3,7 @@ import Mocha from 'mocha';
 import fs from 'fs';
 import path from 'path';
 
-const __dirname = mainFileDirectory;
+const __dirname = globalThis.mainFileDirectory;
 const mocha = new Mocha();
 
 // Read the tests directory

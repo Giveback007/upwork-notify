@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url'
 
 {
     const mainDir = dirname(fileURLToPath(import.meta.url));
-    const keyFile = join(mainDir, '.key');
+    const keyFile = join(mainDir, '../.key');
     const key = readFileSync(keyFile, 'utf-8');
     if (!key) throw new Error(`.key file is missing`);
 
@@ -15,8 +15,12 @@ import { fileURLToPath } from 'url'
         if (!o[key]) throw new Error(`.key file is missing ${key}`);
     });
 
+    const isDev = o.env === 'dev';
+    const bot = o.bots.find((bot: any) => bot.env === o.env);
+    if (!bot) throw new Error(`.key file is missing bot for ${o.env}`);
+
     const globals: Globals = {
-        env: { ...o, isDev: o.env === 'dev' },
+        env: { ...o, isDev, bot },
         mainFileDirectory: mainDir,
         log: (...args: any[]) => {
             const stackLines = new Error().stack!.split('\n');
