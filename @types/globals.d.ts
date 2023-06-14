@@ -8,13 +8,13 @@ type ENV = {
     }[];
     users: {
         username: string;
-        id: string;
+        id: number | string;
         startMsg: string;
     }[];
     chats: {
-        id: number;
+        id: number | string;
         startMsg: string;
-        type: string;
+        type: 'group' | 'private';
     }[];
 }
 

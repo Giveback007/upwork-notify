@@ -16,7 +16,8 @@ export class Scheduler {
         timingPerQue: 1_500,
     }) {}
 
-    toQue = <T>(queId: string, task: () => Promise<T>) => {
+    toQue = <T>(queId: string, task: () => Promise<T>) =>
+    {
         let que = this.que.get(queId);
         if (!que) {
             que = [];
@@ -40,12 +41,14 @@ export class Scheduler {
         return promise;
     }
 
-    getTimings = (queId: string) => ({
+    getTimings = (queId: string) =>
+    ({
         queTimings: this.queTimings[queId],
         perSecTimings: this.perSecTimings,
     })
 
-    private createQuePromise = <T>(): QuePromise<T> => {
+    private createQuePromise = <T>(): QuePromise<T> =>
+    {
         let resolve: QuePromise<T>['resolve'];
         const promise = new Promise((res) => {
             resolve = res;
