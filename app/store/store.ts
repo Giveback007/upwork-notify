@@ -5,7 +5,6 @@ import { MapState } from "./map-state.store";
 import { State } from "./state.store";
 import { CronJob, CronTime } from "cron";
 
-
 // -/-/- // -- appState -- // -/-/- //
 const appState: AppState = readState();
 writeState(appState);
@@ -28,14 +27,21 @@ Object.keys(appState).forEach((key) => {
 // -/-/- // -- bot -- // -/-/- //
 export const bot = new Bot(env.bot.token, env.bot.username);
 
-// -/-/- // -- dayStartEndMsgs -- // -/-/- //
+// -/-/- // -- Cron Jobs -- // -/-/- //
 type ChatCron = { dayStart?: CronJob; dayEnd?: CronJob; };
 const dayStartEndMsgs: { [chatId: string]: ChatCron } = {}
 
-function updateCronJobs(chatId: string, chat: Chat)
+function updateCronJobs(chatId: string, chat: Chat | null)
 {
-    const { active, dayEnd, dayStart, dayEndMsg, dayStartMsg, timeZone } = chat;
     const chatCron: ChatCron = dayStartEndMsgs[chatId] = dayStartEndMsgs[chatId] || {};
+    if (!chat || !chat.active) {
+        chatCron.dayStart?.stop();
+        chatCron.dayEnd?.stop();
+
+        return;
+    };
+
+    const { active, dayEnd, dayStart, dayEndMsg, dayStartMsg, timeZone } = chat;
 
     // If dayStart time is defined
     if (dayStart)
@@ -55,7 +61,7 @@ function updateCronJobs(chatId: string, chat: Chat)
         {
             const newCronJob = new CronJob(cronTime, () =>
             {
-                bot.sendMsg(chatId, '🌅');
+                bot.sendMsg(chatId, '🌞');
                 if (dayStartMsg) bot.sendMsg(chatId, dayStartMsg);
             }, null, active, timeZone);
 
@@ -81,7 +87,7 @@ function updateCronJobs(chatId: string, chat: Chat)
         {
             const newCronJob = new CronJob(cronTime, () =>
             {
-                bot.sendMsg(chatId, '🌌');
+                bot.sendMsg(chatId, '🌛');
                 if (dayEndMsg) bot.sendMsg(chatId, dayEndMsg);
             }, null, active, timeZone);
 
@@ -91,3 +97,11 @@ function updateCronJobs(chatId: string, chat: Chat)
 }
 
 chats.forEach((chat, chatId) => updateCronJobs(chatId, chat));
+chats.on('change', () => {
+    Object.keys(dayStartEndMsgs).forEach((chatId) => {
+        if (chats.get(chatId)) return;
+        updateCronJobs(chatId, null);
+    });
+
+    chats.forEach((chat, chatId) => updateCronJobs(chatId, chat))
+});

@@ -9,9 +9,7 @@ import { fileURLToPath } from 'url'
     if (!key) throw new Error(`.key file is missing`);
 
     const o = JSON.parse(key);
-    const keyObj: { [key in keyof ENV]: '' } = {
-        env: '', bots: '', users: '', chats: ''
-    };
+    const keyObj: { [key in keyof ENV]: '' } = { env: '', bots: '', users: '' };
 
     Object.keys(keyObj).forEach(key => {
         if (!o[key]) throw new Error(`.key file is missing "${key}"`);

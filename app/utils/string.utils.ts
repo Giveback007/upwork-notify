@@ -9,9 +9,7 @@ export function splitAt(str: string, index: number) {
 }
 
 export function splitUpString(str: string, maxLen: number) {
-    if (str.length <= maxLen) {
-      return [str];
-    }
+    if (str.length <= maxLen) return [str];
 
     return str.match(new RegExp(`.{1,${maxLen}}`, 'gs')) || [];
 }

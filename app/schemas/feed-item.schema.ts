@@ -12,7 +12,7 @@ const feedItemExtrasSchema = z.object({
 
 export const feedItemSchema = feedItemExtrasSchema.extend({
     title: z.string(),
-    updated: z.string(),
+    updated: z.number(),
     linkHref: z.string(),
     content: z.string(),
 });

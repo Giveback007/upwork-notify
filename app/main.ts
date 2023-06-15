@@ -11,14 +11,11 @@
 import './init';
 
 // -- Imports -- //
-import { bot, chats } from './store/store';
+import { bot, chats, feeds, jobMsgs, feedItems } from './store/store';
 import { writeFile } from './utils/utils';
 import { botCmds } from './bot/commands.bot';
-// import { getFeed } from './utils/feed.utils';
-// import { arrToRecord, getTime, msToTime, storeFeedItems, time } from './utils/utils';
-// import { generateMessage } from './utils/msg.utils';
-
-// log(cleanStack());
+import { chatDatStartEndDates, getTime, msToTime, time } from './utils/time.utils';
+import { filterFeedItems, filterFeeds, getFeed, storeFeedItems } from './feed';
 
 // -- App Start -- //
 setTimeout(async () => {
@@ -30,35 +27,136 @@ setTimeout(async () => {
         }, ''));
 
         bot.start().then(() => log('[*] BOT INITIALIZED'));
-        console.log('[1]: BOT STARTING...');
+        log('[1]: BOT STARTING...');
 
-        // checkFeeds();
-        // console.log('[2]: FEED CHECKER STARTED');
+        checkFeeds();
+        log('[2]: FEED CHECKER STARTED');
 
-        // updateMsgs();
-        // console.log('[3]: MSG TIMES-UPDATER STARTED');
+        updateMsgs();
+        log('[3]: MSG TIMES-UPDATER STARTED');
 
-        // async import the commands
         await import('./bot/commands.bot');
-        console.log('[4]: COMMANDS INITIALIZED');
+        log('[4]: COMMANDS INITIALIZED');
 
-        
         chats.forEach((chat, chatId) => {
-            // log(chatId, chat)
-            // const { dayStart, dayEnd, timeZone } = chat;
-            // bot.sendMsg(chatId, '💻');
+            if (!chat.active) return;
 
-            // if (dayStart) new CronJob(`${dayStart[1]} ${dayStart[0]} * * *`, () => {
-
-            // }, null, false, timeZone);
-
-            // if (dayEnd) new CronJob(`${dayEnd[1]} ${dayEnd[0]} * * *`, () => {
-                    
-            // });
+            bot.sendMsg(chatId, '💻');
+            bot.sendMsg(chatId, `"Server restarted, '${env.bot.name}' is back online!"`);
+            bot.sendMsg(chatId, "😎 I'm ready to find you some jobs!");
         });
-
-        console.log('[Final]: APP INITIALIZED');
+        log('[Final]: APP INITIALIZED');
     } catch(error) {
         log(error);
     }
 });
+
+const params = {
+    feedCheckFreq: time.min(1),
+    maxJobUpdateAge: time.hrs(3),
+}
+
+// -- Functions -- //
+const jobIsTooOld = (job: FeedItem, noOlderThan: number) =>
+    getTime(job.updated) < (Date.now() - noOlderThan);
+
+function checkFeeds()
+{
+    log(`Checking feeds...`);
+
+    const promises = Array.from(chats.values())
+        .map((chat) => chat.active ? filterFeeds({ feedIds: chat.feedIds }) : [])
+        .flat()
+        .map(async ([feedId, feed]) => feedPullHandler(feedId, feed));
+
+    Promise.allSettled(promises).then(() => {
+        feeds.update(feeds => feeds); // trigger an update
+        setTimeout(checkFeeds, params.feedCheckFreq);
+        log(`Next check in: ${params.feedCheckFreq / time.min(1)} min`);
+    });
+}
+
+async function feedPullHandler(feedId: string, feed: Feed) {
+    const freq = feed.checkFreq;
+    if (feed.lastChecked + freq > Date.now()) return;
+    
+    const { feedItemPullCount, chatId } = feed;
+    try
+    {
+        const items = await getFeed(feed.rssUrl, feedItemPullCount);
+        if (!items) throw new Error(`ERROR: fetching feed "${feedId}"`);
+
+        await feedUpdatesHandler(feedId, items);
+    }
+    catch (error)
+    {
+        log(error);
+        cleanStack(error);
+        if (env.isDev) debugger;
+
+        bot.sendMsg(chatId, `ERROR: fetching feed "${feed.name}"`);
+        feeds.set(feedId, { ...feed, lastChecked: Date.now() });
+    }
+}
+
+
+async function feedUpdatesHandler(feedId: string, newFeedItems: FeedItem[])
+{
+    // store the feed items to json for later analytics
+    storeFeedItems(feedId, newFeedItems);
+
+    const feed = feeds.get(feedId);
+    if (!feed) return log(`Feed not found: ${feedId}`);
+
+    const chat = chats.get(feed.chatId);
+    if (!chat || !chat.active) return log(`Chat not available: ${feed.chatId}`);
+    
+    const now = Date.now();
+    const maxAge = feed.checkFreq * 3;
+    const maxAgeDate = now - maxAge;
+
+    const oldItems = filterFeedItems({ itemIds: feed.itemIds, maxAge: maxAgeDate });//(feeds[hashId]?.items || []).filter(x => !jobIsTooOld(x, freq * 2));
+    const items = new Map(oldItems);
+
+    const newItems = newFeedItems
+        .filter(job => !jobIsTooOld(job, maxAge) && !items.has(job.linkHref))
+        .sort((a, b) => a.updated - b.updated);
+
+    newItems.forEach(job => items.set(job.linkHref, job));
+    const itemIds = Array.from(items.keys());
+
+    feeds.set(feedId, { ...feed, itemIds });
+    if (!newItems.length) return;
+
+    // if time now is outside the dayStart and dayEnd, don't send the message
+    const { start, end } = chatDatStartEndDates(chat, now);
+    if (now > end.getTime() || now < start.getTime()) return;
+
+    // if first message of the day use all jobs from `items`
+    const isFirstMsgOfDay = now - feed.checkFreq < start.getTime();
+    const sendItemsIds = isFirstMsgOfDay ? Array.from(items.keys()) : newItems.map(({ linkHref }) => linkHref);
+    
+    const { h, m } = msToTime(isFirstMsgOfDay ? maxAge : feed.checkFreq);
+    const { chatId } = feed;
+
+    bot.sendMsg(chatId, '📨');
+    bot.sendMsg(chatId, `[📶]: ${feed.name}\n[📬]: ${sendItemsIds.length}\n[⏰]: ${h}h ${m}m]`);
+    sendItemsIds.forEach(jobId => bot.sendJob(chatId, jobId));
+}
+
+
+export function updateMsgs()
+{
+    log('Updating messages...');
+    jobMsgs.forEach(({ feedItemId, date }, jobMsgId): any => {
+        const item = feedItems.has(feedItemId);
+        if (!item) {
+            console.log(`FeedItem not found: ${feedItemId}`);
+            return jobMsgs.delete(jobMsgId);
+        }
+
+        bot.updateJobMsg(jobMsgId, date + params.maxJobUpdateAge);
+    });
+
+    setTimeout(updateMsgs, time.min(1.5));
+}

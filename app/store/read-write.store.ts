@@ -1,40 +1,44 @@
 import { objKeyCheck, readJSON, writeJSON } from "../utils/utils";
 import { MapState } from "./map-state.store";
 import { State } from "./state.store";
-import { stateParams } from "./store.params";
-import { AppState } from "./store.types";
+import { AppState, stateParams } from "./store.types";
+import { UserState } from "./user-state.store";
 
-type WritableState<T> = {
-    [K in keyof T]:
-        T[K] extends MapState<any, any>
-            ? { _t: 'MapState'; _v: [any, any][] } : 
-        T[K] extends State<infer S>
-            ? { _t: 'State'; _v: S } : { _t: 'any'; _v: T[K] };
+const stateKeyObj: { [K in keyof AppState]: any } =
+{
+    _v: '', chats: '', feeds: '', jobMsgs: '', feedItems: '', users: ''
+};
+
+type WritableState<T> =
+{
+    [K in keyof T]: 
+        T[K] extends UserState                      ? [string, User][]  :
+        T[K] extends MapState<string, infer V>      ? [string, V][]     :
+        T[K] extends State<infer V>                 ? V                 :
+        T[K] 
 };
 
 type WrittenState = WritableState<AppState>;
 
 export function writeState(update: Partial<AppState>) {
-    type K = keyof AppState;
+    const writtenState: WrittenState = readJSON(stateParams.statePath) || {} as any;
 
-    const oldState: WrittenState = readJSON(stateParams.statePath) || {} as any;
-    const newState: Partial<WrittenState> = {};
+    (Object.keys(update) as (keyof AppState)[]).forEach((key) =>
+    {
+        const val: any = update[key];
 
-    for (const key in update) {
-        const val: any = update[key as K];
-        
-        if (val instanceof MapState) {
-            newState[key as K] = { _t: 'MapState', _v: val.toEntryArr() } as any;
-        } else if (val instanceof State) {
-            newState[key as K] = { _t: 'State', _v: val.get() } as any;
-        } else {
-            newState[key as K] = { _t: 'any', _v: val } as any;
-        }
-    }
+        if (val instanceof UserState)
+            writtenState[key] = val.entries() as any;
+        else if (val instanceof MapState)
+            writtenState[key] = val.entries() as any;
+        else if (val instanceof State)
+            writtenState[key] = val.get() as any;
+        else
+            writtenState[key] = val as any;
+    });
 
-    const { ok, missingKeys, val } = objKeyCheck({ ...oldState, ...newState }, { _v: '', chats: '', feeds: '', jobMsgs: '', feedItems: '', users: '' });
-    if (!ok)
-        throw new Error(`Missing keys in state: [${missingKeys.join(', ')}]`);
+    const { ok, missingKeys, val } = objKeyCheck(writtenState, stateKeyObj);
+    if (!ok) throw new Error(`Missing keys in state: [${missingKeys.join(', ')}]`);
 
     writeJSON(stateParams.statePath, val);
 }
@@ -48,15 +52,15 @@ export function readState(): AppState {
     const { stateVersion, statePath } = stateParams;
 
     const ws = readJSON<WrittenState>(statePath);
-    const useWS = ws && ws._v._v === stateVersion;
+    const useWS = ws && ws._v === stateVersion;
     
     const appState: AppState = {
-        _v: stateVersion,
-        chats: new MapState(useWS ? ws.chats._v : env.chats),
-        feeds: new MapState(useWS ? ws.feeds._v : null),
-        jobMsgs: new MapState(useWS ? ws.jobMsgs._v : null),
-        feedItems: new MapState(useWS ? ws.feedItems._v : null),
-        users: new MapState(useWS ? ws.users._v : env.users),
+        _v:         stateVersion,
+        chats:      new MapState(useWS  ? ws.chats      : null),
+        feeds:      new MapState(useWS  ? ws.feeds      : null),
+        jobMsgs:    new MapState(useWS  ? ws.jobMsgs    : null),
+        feedItems:  new MapState(useWS  ? ws.feedItems  : null),
+        users:      new UserState(useWS ? ws.users      : env.users),
     };
 
     return appState;

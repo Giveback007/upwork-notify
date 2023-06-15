@@ -5,13 +5,14 @@ import { generateMessage } from '../utils/msg.utils';
 import { Scheduler } from './scheduler.bot';
 import { users } from '../store/store';
 
+const msgLimit = 4096;
 
-const addPartInfo = (msg: string) => splitUpString(msg, 4060)
+const addPartInfo = (msg: string) => splitUpString(msg, msgLimit - 36)
     .map((msgPart, index, { length }) => `(${index+1}/${length}) ${msgPart}` as string);
 
-const addEllipsis = (msg: string) => msg.slice(0, 4093) + '...';
+const addEllipsis = (msg: string) => msg.length > msgLimit ? msg.slice(0, msgLimit - 3) + '...' : msg;
 
-const toSplitMsgs = (msg: string) => msg.length > 4096 ? addPartInfo(msg) : [msg];
+const toSplitMsgs = (msg: string) => msg.length > msgLimit ? addPartInfo(msg) : [msg];
 
 // https://t.me/${env.BOT_USERNAME}
 export class Bot {
@@ -59,7 +60,7 @@ export class Bot {
 
         const val = (result.filter(({ ok }) => ok) as {
             ok: true;
-            out: TelegramBot.Message;
+            out: TelegramMsg;
         }[]).map(({ out }) => out);
 
         return allOk ? {
@@ -73,6 +74,33 @@ export class Bot {
                 out: any;
             }[]).map(({ out }) => out),
         }
+    }
+
+    updateJobMsg = async (jobMsgId: string, lastMsgTime?: number) =>
+    {
+        const now = Date.now();
+
+        const jobMsg = jobMsgs.get(jobMsgId);
+        if (!jobMsg) return log(`No message found with id ${jobMsgId}`);
+
+        const feedItem = feedItems.get(jobMsg.feedItemId);
+        if (!feedItem) return log(`Feed item not found: ${jobMsg.feedItemId}`);
+
+        const updateMsg = addEllipsis(generateMessage(feedItem));
+
+        return this.scheduler.toQue(jobMsg.chatId, () => this.bot.editMessageText(updateMsg, {
+            chat_id: jobMsg.chatId,
+            message_id: Number(jobMsg.msgId),
+            disable_web_page_preview: true
+        })).then(res => {
+            if (res.ok && lastMsgTime && lastMsgTime < now) jobMsgs.delete(jobMsgId);
+            return res;
+        });
+    }
+
+    sendImg = async (chatId: string, imgPath: string) =>
+    {
+        return this.scheduler.toQue(chatId, () => this.bot.sendPhoto(chatId, imgPath));
     }
 
     sendJob = async (chatId: string, feedItemId: string) =>
@@ -101,31 +129,8 @@ export class Bot {
         }
     }
 
-    sendImg = async (chatId: string, imgPath: string) =>
-    {
-        return this.scheduler.toQue(chatId, () => this.bot.sendPhoto(chatId, imgPath));
-    }
-
-    update = async (chatId: string, msgId: string, updateMsg: string) =>
-    {
-        const jobMsg = jobMsgs.get(this.genMsgId(chatId, msgId));
-        if (!jobMsg) return log(`No message found with id ${msgId}`);
-
-        return this.scheduler.toQue(chatId, () => this.bot.editMessageText(updateMsg, {
-            chat_id: chatId,
-            message_id: Number(jobMsg.msgId),
-            disable_web_page_preview: true
-        }));
-    }
-
     genMsgId = (chatId: string | number, msgId: string | number) => `${chatId}-${msgId}`;
 
-    validateUser = (from?: TelegramBot.User) =>
-    {
-        if (!from) return false;
-        const userId = from.id.toString();
-        const user = users.get(userId);
-
-        return !!user;
-    }
+    validateUser = (from?: TelegramUser) =>
+        Boolean(from?.username && users.get(from.username)?.isActive);
 }

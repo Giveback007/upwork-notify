@@ -1,5 +1,5 @@
 import { genChat, genFeed, handleZod } from "../utils/utils";
-import { bot, chats, feeds } from "../store/store";
+import { bot, chats, feeds, users } from "../store/store";
 import { feedItemParamsSchema } from "../schemas/feed-item-params.schema";
 import TelegramBot, { Message } from "node-telegram-bot-api";
 import { filterFeeds } from "../feed";
@@ -15,7 +15,9 @@ type ChatStates =
     | TimeZoneState
     | SetDayStartState
     | SetDayEndState
-    | ChatInfoState;
+    | ChatInfoState
+    | SetStartMsgState
+    | SetEndMsgState;
 
 type IChatState =
 {
@@ -82,10 +84,23 @@ type ChatInfoState = IChatState &
     step?: chatInfoStep;
 };
 
+enum setStartMsgStep { INIT, MSG, }
+type SetStartMsgState = IChatState &
+{
+    type: '/set_start_msg';
+    step?: setStartMsgStep;
+};
+
+enum setEndMsgStep { INIT, MSG, }
+type SetEndMsgState = IChatState &
+{
+    type: '/set_end_msg';
+    step?: setEndMsgStep;
+};
+
 // -- // Command Lists // -- //
-export const botCmds: {
-    [cmd in ChatStates['type'] | '/cancel']: string
-} =
+type NonStateCmds = '/start' | '/stop' | '/cancel';
+export const botCmds: { [cmd in ChatStates['type'] | NonStateCmds]: string } =
 {
     '/url_add': 'Add an Upwork url',
     '/urls': 'Get the list of urls',
@@ -95,11 +110,13 @@ export const botCmds: {
     '/set_day_start': 'Set the day start time',
     '/set_day_end': 'Set the day end time',
     "/chat_info": 'Get the chat info',
-    // '/set_start_msg',
-    // '/check_feed'
+    '/start': 'Start the bot',
+    '/stop': 'Stop the bot',
+    '/set_start_msg': 'Set the start day message',
+    '/set_end_msg': 'Set the end day message',
 }
 
-const cmdRegx = (Object.keys(botCmds) as (ChatStates['type'] | '/cancel')[])
+const cmdRegx = (Object.keys(botCmds) as (keyof typeof botCmds)[])
     .map((cmd) => ({ cmd, regx: `^${cmd}(${bot.username})?$` }));
 
 // --- // ChatState // --- //
@@ -175,6 +192,10 @@ function chatStateHandler(state: ChatStates, msg: TelegramBot.Message): any
             return setDayEndHandler(state, text);
         case '/chat_info':
             return chatInfoHandler(state);
+        case '/set_start_msg':
+            return setStartMsgHandler(state, text);
+        case '/set_end_msg':
+            return setEndMsgHandler(state, text);
         default:
             // this should never happen
             const errMsg = `ERROR: Unhandled ChatState type: ${(state as any).type}`;
@@ -185,6 +206,51 @@ function chatStateHandler(state: ChatStates, msg: TelegramBot.Message): any
 }
 
 // --- // ChatState Handlers // --- //
+function setStartMsgHandler(state: SetStartMsgState, text: string): any
+{
+    const { chatId } = state;
+
+    switch (state.step)
+    {
+        case setStartMsgStep.INIT:
+            state.step++;
+            return bot.sendMsg(chatId, 'Enter the message to send at the start of the day');
+        case setStartMsgStep.MSG:
+            const chat = chats.get(chatId);
+            if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
+
+            chat.dayStartMsg = text;
+            chats.set(chatId, chat);
+
+            chatStates.delete(chatId);
+            return bot.sendMsg(chatId, 'Message set');
+        default: unhandledCommand(state, chatId);
+    }
+}
+
+function setEndMsgHandler(state: SetEndMsgState, text: string): any
+{
+    // Fill in the function
+    const { chatId } = state;
+
+    switch (state.step)
+    {
+        case setEndMsgStep.INIT:
+            state.step++;
+            return bot.sendMsg(chatId, 'Enter the message to send at the end of the day');
+        case setEndMsgStep.MSG:
+            const chat = chats.get(chatId);
+            if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
+
+            chat.dayEndMsg = text;
+            chats.set(chatId, chat);
+
+            chatStates.delete(chatId);
+            return bot.sendMsg(chatId, 'Message set');
+        default: unhandledCommand(state, chatId);
+    }
+}
+
 function chatInfoHandler(state: ChatInfoState): any
 {
     const { chatId } = state;
@@ -237,7 +303,7 @@ function setDayEndHandler(state: SetDayEndState, text: string): any
             chats.set(chatId, chat);
 
             chatStates.delete(chatId);
-            return bot.sendMsg(chatId, `Your "day end" time is now set to ${time[0]}:${time[1]}`);
+            return bot.sendMsg(chatId, `Your "day end" time is now set to ${toStrHhMm(time)}`);
         default: unhandledCommand(state, chatId);
     }
 }
@@ -265,7 +331,7 @@ function setDayStartHandler(state: SetDayStartState, text: string): any
             chats.set(chatId, chat);
 
             chatStates.delete(chatId);
-            return bot.sendMsg(chatId, `Your "day start" is set to: "${time[0]}:${time[1]}"`);
+            return bot.sendMsg(chatId, `Your "day start" is set to: "${toStrHhMm(time)}"`);
         default: unhandledCommand(state, chatId);
     }
 }
@@ -455,7 +521,8 @@ const vldtUser = (msg: Message) =>
         return null;
     }
 
-    return { chatId, userId: from.id.toString(), isBot: from.is_bot };
+    const user = users.get(chatId)!;
+    return { chatId, userId: from.id.toString(), isBot: from.is_bot, roles: user.roles };
 }
 
 bot.getBot().onText(new RegExp(`^/start(${bot.username})?$`, 'i'), (msg) =>
@@ -469,13 +536,12 @@ bot.getBot().onText(new RegExp(`^/start(${bot.username})?$`, 'i'), (msg) =>
     {
         chats.set(from.chatId, genChat({ type, active: true }));
         bot.sendMsg(from.chatId, `Welcome! I am ready to find jobs for you!\n`
-            + `\n  - Share your location to set your timezone.` +
-            + `\n  - Use /add_url to add a new feed.`);
+            + `\n  - Share your location to set your timezone.\n  - Use /add_url to add a new feed.`);
     }
     else
     {
         if (chat.active)
-            bot.sendMsg(from.chatId, `😄 I am already working for you!`);
+            bot.sendMsg(from.chatId, `😄 I am already working!`);
         else
         {
             chat.active = true;
@@ -498,9 +564,47 @@ bot.getBot().onText(new RegExp(`^/stop(${bot.username})?$`, 'i'), (msg) =>
     else
     {
         chat.active = false;
+        chats.set(chatId, chat);
         bot.sendMsg(chatId, `I am now offline. Use /start to start me again.`);
     }
 });
+
+bot.getBot().onText(/\/add_user( .+)?/, (msg, match): any =>
+{
+    const from = vldtUser(msg);
+    if (!from || !from.roles.admin) return;
+    const newUser = (match?.[1]) ? (match[1]?.trim()) : null;
+
+    // Check if a username was provided
+    if (!newUser) {
+        bot.sendMsg(from.chatId, `Username "${newUser}" is not valid`);
+    } else {
+        const user = users.get(newUser);
+        if (user) return bot.sendMsg(from.chatId, `Username "${newUser}" is already in use`);
+
+        users.set(newUser, { isActive: true, roles: {}, username: newUser });
+        bot.sendMsg(from.chatId, `Username "${newUser}" has been added`);
+    }
+});
+
+bot.getBot().onText(/\/del_user( .+)?/, (msg, match): any =>
+{
+    const from = vldtUser(msg);
+    if (!from || !from.roles.admin) return;
+    const delUser = (match?.[1]) ? (match[1]?.trim()) : null;
+
+    // Check if a username was provided
+    if (!delUser) {
+        bot.sendMsg(from.chatId, `Username "${delUser}" is not valid`);
+    } else {
+        const user = users.get(delUser);
+        if (!user) return bot.sendMsg(from.chatId, `Username "${delUser}" does not exist in the database`);
+
+        users.set(delUser, { ...user, isActive: false });
+        bot.sendMsg(from.chatId, `Username "${delUser}" has been set to inactive`);
+    }
+});
+
 
 cmdRegx.forEach(({ cmd, regx }) =>
 {
@@ -510,7 +614,10 @@ cmdRegx.forEach(({ cmd, regx }) =>
         if (!from) return;
 
         const { chatId } = from;
+        const chat = chats.get(chatId);
         const state = chatStates.get(chatId);
+
+        if (!chat?.active) return;
 
         if (state)
         {
@@ -518,7 +625,7 @@ cmdRegx.forEach(({ cmd, regx }) =>
             bot.sendMsg(chatId, `Canceling: "${state.type}"` + (cmd === '/cancel' ? '' : `\nStarting: "${cmd}"`));
         }
 
-        if (cmd === '/cancel') return;
+        if (cmd === '/cancel' || cmd === '/start' || cmd === '/stop') return;
         chatStateHandler({ ...from, type: cmd }, msg);
     });
 });

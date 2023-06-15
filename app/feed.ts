@@ -6,21 +6,21 @@ import { atomFeedToJSONSchema } from "./schemas/atom-to-json.schema";
 import { feedItemSchema } from "./schemas/feed-item.schema";
 import { isType } from "./utils/test.utils";
 import { feedItems, feeds } from "./store/store";
+import { getTime } from "./utils/time.utils";
 
-export function storeFeedItems(feedId: string, feed: Feed) {
+export function storeFeedItems(feedId: string, newFeedItems: FeedItem[])
+{
     const filePath = `../data/feeds/${feedId}.json`;
 
-    const items = readJSON<Record<string, FeedItem>>(filePath) || {};
-    feed.itemIds.map((id) => feedItems.get(id)).forEach((item) => {
-        if (!item) return;
-        items[item.linkHref] = item;
-    });
+    const oldItems = readJSON<Record<string, FeedItem>>(filePath) || {};
+    newFeedItems.forEach((item) => oldItems[item.linkHref] = item);
 
-    writeJSON(filePath, items);
+    writeJSON(filePath, oldItems);
 }
 
 // https://www.upwork.com/ab/feed/jobs/atom?q=javascript&user_location_match=1&sort=recency&paging=0%3B10&api_params=1&securityToken=b8e9762da3383da88fdab543aaf25418ab321582509f154a4c322e49a5bc293e95645f9f157483f64618af05227ddb546a700cc96a3dae3177e3066c0c67d612&userUid=1057152582708793344&orgUid=1057152582717181953
-export async function getFeed(atomUrl: string, num: Feed['feedItemCount'] = 20) {
+export async function getFeed(atomUrl: string, num: Feed['feedItemPullCount'] = 20)
+{
     const xmlPath = `../data/xml/feed.${hashString(atomUrl, 'md5')}.xml`;
     atomUrl = urlParamsFix(atomUrl, {
         sort: 'recency',
@@ -56,7 +56,8 @@ export async function getFeed(atomUrl: string, num: Feed['feedItemCount'] = 20) 
     }
 }
 
-export function urlParamsFix(link: string, addParams: { [key: string]: string } = {}) {
+export function urlParamsFix(link: string, addParams: { [key: string]: string } = {})
+{
     const url = new URL(link);
     
     Object.entries(addParams).forEach(([key, value]) =>
@@ -65,7 +66,8 @@ export function urlParamsFix(link: string, addParams: { [key: string]: string } 
     return url.toString();
 }
 
-export async function xmlToJSON(xml: string) {
+export async function xmlToJSON(xml: string)
+{
     const parser = new xml2js.Parser({
         explicitArray: false,
         mergeAttrs: true,
@@ -85,7 +87,7 @@ export async function xmlToJSON(xml: string) {
 
         const item = {
             title: x.title.replace(/ - Upwork$/, ''),
-            updated: x.updated,
+            updated: getTime(x.updated),
             linkHref: x.id,
             content,
             ...extras,
@@ -104,7 +106,8 @@ export async function xmlToJSON(xml: string) {
     return items;
 }
 
-export function cleanUpContent(input: string) {
+export function cleanUpContent(input: string)
+{
     const str = input
         .replace(/<br\s*\/?>/g, '\n')
         .replace(/<[^>]*>/g, '')
@@ -115,7 +118,8 @@ export function cleanUpContent(input: string) {
     return replaceHtmlEntities(str);
 }
 
-export function parseContent(content: string) {
+export function parseContent(content: string)
+{
     const extras = {} as FeedItemExtras;
     const breakIdx = content.lastIndexOf('<br /><br /><b>');
     
@@ -141,14 +145,15 @@ type FeedFilters = { userId?: string, chatId?: string, feedIds?: string[] };
 export function filterFeeds(filters: FeedFilters): [string, Feed][];
 export function filterFeeds(filters: FeedFilters, getIds: false): [string, Feed][];
 export function filterFeeds(filters: FeedFilters, getIds: true): string[];
-export function filterFeeds(filters: FeedFilters, getIds: boolean = false): [string, Feed][] | string[] {
+export function filterFeeds(filters: FeedFilters, getIds: boolean = false): [string, Feed][] | string[]
+{
     const { userId, chatId, feedIds } = filters;
     const filteredFeeds: [string, Required<FeedParams>][] = [];
-    const rec = feedIds ? idsToRecord(feedIds) : null;
+    const idRec = feedIds ? idsToRecord(feedIds) : null;
 
     let idx = 0;
     feeds.forEach((feed, id) => {
-        if (rec && !rec[id]) return;
+        if (idRec && !idRec[id]) return;
         if (userId && feed.userId !== userId) return;
         if (chatId && feed.chatId !== chatId) return;
 
@@ -159,4 +164,28 @@ export function filterFeeds(filters: FeedFilters, getIds: boolean = false): [str
         filteredFeeds.map(([id]) => id)
         :
         filteredFeeds;
+}
+
+type FeedItemFilters = { countries?: string[], categories?: string[], itemIds?: string[], maxAge?: number | Date };
+export function filterFeedItems(filters: FeedItemFilters)
+{
+    const f = (s: string) => s.toLocaleLowerCase().trim();
+    const { countries, categories, itemIds, maxAge: dt } = filters;
+    const maxAge = isType(dt, 'Date') ? dt.getTime() : dt;
+
+    const idRec = itemIds ? idsToRecord(itemIds) : null;
+    const countryRec = countries ? idsToRecord(countries.map(f)) : null;
+    const categoryRec = categories ? idsToRecord(categories.map(f)) : null;
+
+    const filteredFeedItem: [string, FeedItem][] = [];
+    feedItems.forEach((item, id) => {
+        if (idRec && !idRec[id])                            return;
+        if (maxAge && item.updated < maxAge)                return;
+        if (categoryRec && !categoryRec[f(item.Category)])  return;
+        if (countryRec  && !countryRec[f(item.Country)])    return;
+    
+        filteredFeedItem.push([id, item]);
+    });
+
+    return filteredFeedItem;
 }

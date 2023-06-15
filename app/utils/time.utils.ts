@@ -54,7 +54,8 @@ export function msToTime(msT: number)
     return { d, h, m, s, ms };
 }
 
-export const getTime = (date: string | number | Date) => new Date(date).getTime();
+export const getTime = (date: string | number | Date) =>
+    date instanceof Date ? date.getTime() : new Date(date).getTime();
 
 export const time =
 {
@@ -66,3 +67,16 @@ export const time =
 
 export const wait = (ms: number) =>
     new Promise(r => setTimeout(r, ms));
+
+export function chatDatStartEndDates(chat: Chat, now = Date.now()) {
+    const dayStart = chat.dayStart || [6, 30];
+    const dayEnd = chat.dayEnd || [22, 0];
+
+    const start = new Date(now);
+    start.setHours(dayStart[0], dayStart[1], 0, 0);
+
+    const end = new Date(now);
+    end.setHours(dayEnd[0], dayEnd[1], 0, 0);
+
+    return { start, end };
+}

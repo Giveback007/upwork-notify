@@ -13,3 +13,20 @@ type ChatParams = {
     /** A flag to indicate if the user /start or /stop the bot */
     active?: boolean;
 }
+
+type User = {
+    roles: Partial<{
+        dev: boolean;
+        admin: boolean;
+    }>;
+    isActive: boolean;
+    username: string;
+    telegramUser?: TelegramUser;
+};
+
+type BotUser = {
+    name: string;
+    username: string;
+    token: string;
+    env: 'dev' | 'prod';
+}

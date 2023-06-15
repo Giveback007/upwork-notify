@@ -61,7 +61,8 @@
     "include": [
         "app/**/*.ts",
         "app-(old)/**/*.ts",
-        "@types/**/*.d.ts"
+        "@types/**/*.d.ts",
+        "@types/types-expose.d.ts"
     ],
     "exclude": ["./node_modules"]
 }

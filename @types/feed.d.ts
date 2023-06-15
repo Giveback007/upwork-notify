@@ -11,7 +11,7 @@ type FeedParams = {
     /** At which point to stop updating the job-msg */
     maxJobUpdateAge?: number;
     /** How many items to return from the feed (when pulled online from rss/atom) */
-    feedItemCount?: 10 | 20 | 50 | 100;
+    feedItemPullCount?: 10 | 20 | 50 | 100;
 
     checkFreq?: number;
     itemIds?: string[];
@@ -20,7 +20,7 @@ type FeedParams = {
 
 type FeedItem = {
     title: string;
-    updated: string;
+    updated: number;
     /** This also acts as an Id */
     linkHref: string;
     content: string;

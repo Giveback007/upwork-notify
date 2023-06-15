@@ -6,3 +6,7 @@ set_timezone - Set the timezone
 set_day_start - Set the day start time
 set_day_end - Set the day end time
 chat_info - Get the chat info
+start - Start the bot
+stop - Stop the bot
+set_start_msg - Set the start day message
+set_end_msg - Set the end day message

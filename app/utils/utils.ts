@@ -8,15 +8,15 @@ export const genFeed =
     itemIds,
     lastChecked,
     checkFreq,
-    feedItemCount,
-    maxJobUpdateAge, 
+    feedItemPullCount,
+    maxJobUpdateAge,
     ...rest 
 }: FeedParams): Feed =>
 ({
     itemIds: itemIds ?? [],
     lastChecked: lastChecked ?? 0,
-    checkFreq: checkFreq ?? 0,
-    feedItemCount: feedItemCount ?? 20,
+    checkFreq: checkFreq ?? time.min(20),
+    feedItemPullCount: feedItemPullCount ?? 20,
     maxJobUpdateAge: maxJobUpdateAge ?? time.hrs(3),
     ...rest,
 });
@@ -116,16 +116,18 @@ export function idsToRecord(arr: string[])
 
 export const arrLast = <T>(arr: T[]) => arr[arr.length - 1];
 
-export const objKeyCheck = <T extends AnyObj>(obj: T, keyObj: { [key in keyof T]: any }) =>
+export const objKeyCheck = <T extends AnyObj>(obj: T, keysObj: { [key in keyof T]: any }) =>
 {
     const missingKeys: string[] = [];
-    for (const key in keyObj)
+    const keys = [];
+    for (const key in keysObj)
     {
         if (obj[key] === undefined) missingKeys.push(key);
+        else keys.push(key);
     }
 
     return missingKeys.length ?
         { ok: false, missingKeys } as const
         :
-        { ok: true, val: obj, } as const;
+        { ok: true, val: obj, keys: keys as TupleKeys<T> } as const;
 }
