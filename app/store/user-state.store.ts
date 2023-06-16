@@ -4,19 +4,22 @@ export class UserState extends MapState<string, User>
 {
     constructor(iterable?: Iterable<readonly [string, User]> | null | undefined)
     {
-        super();
-
-        if (iterable)
-            Array.from(iterable).forEach(([key, value]) =>
-                super.set(this.usrKey(key), value));
+        if (iterable) iterable = Array.from(iterable).map(([key, value]) =>
+            [(key[0] !== '@' ? '@' + key : key).toUpperCase(), value]);
+        
+        super(iterable);
     }
 
     private usrKey = (username: string) =>
         (username[0] !== '@' ? '@' + username : username).toUpperCase();
 
-    override get = (username: string) => super.get(this.usrKey(username));
-    override has = (username: string) => super.has(this.usrKey(username));
+    override get = (username: string) => this._mapStateThis.get(this.usrKey(username));
+    override has = (username: string) => this._mapStateThis.has(this.usrKey(username));
 
-    override set = (username: string, user: User) => super.set(this.usrKey(username), user);
-    override delete = (username: string) => super.delete(this.usrKey(username));   
+    override set = (username: string, user: User) => {
+        this._mapStateThis.set(this.usrKey(username), user);
+        return this;
+    };
+
+    override delete = (username: string) => this._mapStateThis.delete(this.usrKey(username));   
 }

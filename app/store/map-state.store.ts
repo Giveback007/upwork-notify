@@ -30,6 +30,7 @@ type UpdateAction<K extends string | number, V> = {
 
 export class MapState<K extends string | number, V> extends EventEmitter {
 
+    protected _mapStateThis;
     private map: Map<K, V>
 
     get size(): number {
@@ -40,6 +41,8 @@ export class MapState<K extends string | number, V> extends EventEmitter {
         iterable?: Iterable<readonly [K, V]> | null | undefined
     ) {
         super();
+        this._mapStateThis = { ...this as MapState<K, V> };
+
         this.map = new Map<K, V>(iterable);
     }
 
@@ -81,9 +84,6 @@ export class MapState<K extends string | number, V> extends EventEmitter {
 
     // Iteration Method for 'for...of' loops
     [Symbol.iterator] = (): IterableIterator<[K, V]> => this.map[Symbol.iterator]();
-
-    // Conversion Methods
-    toEntryArr = () => Array.from(this.map);
 
     // @ts-ignore
     override on = (event: "change", listener: (changeHistory: MapStateActions<K, V>[]) => void) => {

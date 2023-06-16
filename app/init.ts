@@ -65,12 +65,20 @@ import { fileURLToPath } from 'url'
     process.on('uncaughtException', (err) => {
         console.error('An uncaughtException was found, the program will end.');
         console.error(err.stack);
+
+        log(cleanStack(err));
+        if (env.isDev) debugger;
+
         process.exit(1);
     });
 
     // @ts-ignore
     process.on('unhandledRejection', (reason, promise) => {
         console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+
+        if (reason instanceof Error) cleanStack(reason);
+        if (env.isDev) debugger;
+
         process.exit(1);
     });
 }
