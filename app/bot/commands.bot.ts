@@ -5,7 +5,7 @@ import TelegramBot, { Message } from "node-telegram-bot-api";
 import { filterFeeds } from "../feed";
 import { randomUUID as UUID } from 'crypto';
 import { find } from 'geo-tz';
-import { parseHhMm, time, toStrHhMm } from "../utils/time.utils";
+import { msToTime, parseHhMm, time, toStrHhMm } from "../utils/time.utils";
 
 // --- // ChatStates Types // --- //
 type ChatStates =
@@ -138,10 +138,11 @@ setInterval(() =>
 bot.getBot().on('message', (msg) =>
 {
     const from = vldtUser(msg);
-    if (!from || from.isBot) return;
+    if (!from || from.isBot || msg.location) return;
 
     const { chatId, userId } = from;
     const state = chatStates.get(chatId);
+    if (!state || state.userId !== userId) return;
 
     // Check if command & exit if is
     if (msg.text?.startsWith('/'))
@@ -150,10 +151,7 @@ bot.getBot().on('message', (msg) =>
         if (cmd) return;
     }
     
-    if (state && state.userId === userId)
-    {
-        chatStateHandler(state, msg);
-    }
+    chatStateHandler(state, msg);
 });
 
 bot.getBot().on('location', (msg) =>
@@ -185,7 +183,7 @@ function chatStateHandler(state: ChatStates, msg: TelegramBot.Message): any
         case '/url_del':
             return urlDeleteHandler(state, text);
         case '/set_timezone':
-            return timeZoneHandler(state, msg);
+            return setTimeZoneHandler(state, msg);
         case '/set_day_start':
             return setDayStartHandler(state, text);
         case '/set_day_end':
@@ -260,18 +258,29 @@ function chatInfoHandler(state: ChatInfoState): any
         case chatInfoStep.INIT:
             const chat = chats.get(chatId);
             if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
-            const { timeZone, dayStart, dayEnd } = chat;
+
+            const now = Date.now();
+            const { timeZone, dayStart, dayEnd, feedIds } = chat;
             const dayStartStr = dayStart ? `${toStrHhMm(dayStart)}` : 'Not set';
             const dayEndStr = dayEnd ? `${toStrHhMm(dayEnd)}` : 'Not set';
             const dayStartMsg = chat.dayStartMsg || 'Not set';
             const dayEndMsg = chat.dayEndMsg || 'Not set';
+            const feedList = filterFeeds({feedIds}).map(([, feed], i) =>
+            {
+                const { name, lastChecked } = feed;
+                const { h, m } = msToTime(now - lastChecked);
+
+                return `[${i + 1}]: (${h}h ${(m.toString().padStart(2 , '0'))}m) ${name}`
+            }).join('\n') || 'No feeds added';
 
             const msg = ''
                 + `\nTimezone: "${timeZone}"\n`
                 + `\nDay Start: ${dayStartStr}`
                 + `\nDay End: ${dayEndStr}\n`
                 + `\nDay Start Msg: \n"${dayStartMsg}"\n`
-                + `\nDay End Msg: \n"${dayEndMsg}"\n`;
+                + `\nDay End Msg: \n"${dayEndMsg}"\n`
+                + `\nFeeds:\n${feedList}`;
+            
 
             chatStates.delete(chatId);
             return bot.sendMsg(chatId, msg);
@@ -336,14 +345,13 @@ function setDayStartHandler(state: SetDayStartState, text: string): any
     }
 }
 
-function timeZoneHandler(state: TimeZoneState, msg: TelegramBot.Message): any
+function setTimeZoneHandler(state: TimeZoneState, msg: TelegramBot.Message): any
 {
     const { chatId, step } = state;
 
     switch (step)
     {
         case timeZoneStep.INIT:
-            state.step!++;
             return bot.sendMsg(chatId, 'Please share your location');
         case timeZoneStep.TIMEZONE:
             if (!msg.location) return bot.sendMsg(chatId, 'Could not get your location.\nPlease share your location');
@@ -445,9 +453,8 @@ function urlAddHandler(state: UrlAddState, text: string): any
     switch (step)
     {
         case urlAddStep.INIT:
-            bot.sendMsg(chatId, `Please provide the URL.`);
             state.step!++;
-            break;
+            return bot.sendMsg(chatId, `Please provide the URL.`);
         case urlAddStep.URL:
             if (!text.includes('https://www.upwork.com/ab/feed/jobs/atom')) {
                 chatStates.delete(chatId);
@@ -468,7 +475,7 @@ function urlAddHandler(state: UrlAddState, text: string): any
             
             break;
         case urlAddStep.NAME:
-            const feed = feeds.entriesArr().find(([,{ name }]) => name === text);
+            const feed = filterFeeds({ chatId }).find(([,{ name }]) => name === text);
             if (feed)
                 return bot.sendMsg(chatId, `Name "${text}" is already being used.\n\nPlease try again with a different name.`);
 

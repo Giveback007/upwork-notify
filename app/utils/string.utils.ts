@@ -35,7 +35,7 @@ export function hashString(input: string, type: HashType = 'sha256'): string {
     return hash.digest('hex');
 }
 
-export function cleanUpContent(input: string, goDev = true)
+export function cleanUpContent(input: string)
 {
     const str = input
         .replace(/<br\s*\/?>/g, '\n')

@@ -149,6 +149,7 @@ export function filterFeeds(filters: FeedFilters, getIds: boolean = false): [str
         if (chatId && feed.chatId !== chatId) return;
 
         filteredFeeds[idx] = [id, feed];
+        idx++;
     });
 
     return getIds ?
