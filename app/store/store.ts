@@ -23,17 +23,6 @@ export const {
 // -/-/- // -- state change listeners -- // -/-/- //
 (Object.keys(appState) as (keyof AppState)[]).forEach((key) => {
     const item: any = appState[key];
-    if (key === 'feedItems') {
-        // filter out old feed items
-        feedItems.on('change', () => {
-            const now = Date.now();
-            const oldItems = filterFeedItems({ minAge: now - time.day(0.5) });
-            if (oldItems.length === feedItems.size) return;
-
-            oldItems.forEach(([id]) => feedItems.delete(id));
-        });
-    }
-
     if (item instanceof UserState || item instanceof MapState || item instanceof State)
         item.on('change', () => writeState({ [key]: item }));
 });
@@ -42,6 +31,18 @@ export const {
 export const bot = new Bot(env.bot.token, env.bot.username);
 
 // -/-/- // -- Cron Jobs -- // -/-/- //
+
+// cron job for removing old feed items every hour
+new CronJob('0 * * * *', () => {
+    /** No younger than (item.updated < MinAge) */
+    const oldItems = filterFeedItems({ minAge: Date.now() - time.day(0.5) });
+    if (oldItems.length === feedItems.size) return;
+
+    oldItems.forEach(([id]) => feedItems.delete(id));
+}, null, true);
+
+
+
 type ChatCron = { dayStart?: CronJob; dayEnd?: CronJob; };
 const dayStartEndMsgs: { [chatId: string]: ChatCron } = {}
 

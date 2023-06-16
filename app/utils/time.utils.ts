@@ -69,7 +69,7 @@ export const wait = (ms: number) =>
     new Promise(r => setTimeout(r, ms));
 
 export function chatDatStartEndDates(chat: Chat, now = Date.now()) {
-    const dayStart = chat.dayStart || [6, 30];
+    const dayStart = chat.dayStart || [7, 0];
     const dayEnd = chat.dayEnd || [22, 0];
 
     const start = new Date(now);

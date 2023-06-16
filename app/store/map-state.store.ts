@@ -49,6 +49,9 @@ export class MapState<K extends string | number, V> extends EventEmitter {
     // Accessor Methods
     get = (key: K): V | undefined => this.map.get(key);
     has = (key: K): boolean => this.map.has(key);
+    getVals = (keys: K[]): V[] => keys
+        .map((key) => this.map.get(key))
+        .filter((val) => val !== undefined) as V[];
 
     // Mutator Methods
     set = (key: K, val: V): this => {

@@ -1,4 +1,4 @@
-import { msToTime, time } from "./time.utils";
+import { msToTime } from "./time.utils";
 
 const map = {
     'Country': '[🌎]: ',
@@ -8,9 +8,9 @@ const map = {
     'Location Requirement': '[📍-Loc-Recq]: ',
 }
 
-export function generateMessage(feedItem: FeedItem) {
+export function generateMessage(feedItem: FeedItem, maxAgeDt: number = Infinity) {
     const { title, updated, linkHref, content, Category, ...ext } = feedItem;
-    const { str } = ageOfPost(feedItem);
+    const { str } = ageOfPost(feedItem, maxAgeDt);
 
     // TODO:
     // `${type === 'updated' ? '[UPDATE]:' : ''}
@@ -41,14 +41,15 @@ ${content}`;
     return message;
 }
 
-export function ageOfPost(item: FeedItem) {
+export function ageOfPost(item: FeedItem, maxAgeDt: number) {
+    const now = Date.now();
     const t = new Date(item.updated).getTime();
-    const ageMs = Date.now() - t;
+    const ageMs = now - t;
 
     const {d, h, m} = msToTime(ageMs);
 
     let str;
-    if (time.hrs(h) >= time.hrs(3)) {
+    if (now > maxAgeDt) {
         str = `(Stopped updating) Older than ${h} hours`;
     } else {
         str = `${h}h ${m}m`;

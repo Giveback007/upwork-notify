@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { Scheduler } from '../app/bot/scheduler.bot';
+import { wait } from '../app/utils/time.utils';
 import sinon from 'sinon';
-import { wait } from '../app/utils/utils';
 
 const log = console.log;
 
@@ -58,11 +58,12 @@ describe('Scheduler', function () {
         const timings = await Promise.all(tasks);
         const timeValues = timings.filter((t) => t.ok).map((t) => t.out as number);
 
+        log('\n');
         timeValues.forEach((t, i) => {
             if (i === 0) return;
 
             const diff = t - timeValues[i - 1];
-            log(`Item-${i + 1}:`, (diff / sec).toFixed(2) + 'sec');
+            log(`Item-${i}:`, (diff / sec).toFixed(2) + 'sec');
             expect(diff).to.be.at.least(limits.timingPerQue);
         }); 
     });
@@ -83,16 +84,36 @@ describe('Scheduler', function () {
             // the time between the first and last task should be at least 2mins
             const diff = (timeValues[timeValues.length - 1] - timeValues[0]) / min;
             expect(diff).to.be.at.least(2);
-            log('Time It Took:', diff.toFixed(2) + 'min');
+
+            let minStart = timeValues[0];
+            let minEnd = minStart + min;
+            let minIdx = 0;
+            const minutes: number[] = [0];
+            timeValues.forEach((t) => {
+                if (t >= minEnd) {
+                    minIdx++;
+                    minStart = minEnd + 1;
+                    minEnd = minStart + min;
+                    minutes[minIdx] = 0;
+                }
+                
+                minutes[minIdx]++;
+            });
+
+            log('\n');
+            minutes.forEach((tasksCompleted, i) => {
+                log(`Minute-${i}:`, tasksCompleted);
+                expect(tasksCompleted).to.be.at.most(limits.allItemsPerSec);
+            });
         });
     });
     
     it(`should not allow more than ("allItemsPerSec": ${limits.allItemsPerSec}) tasks per second for all queIds`, async () => {
-        setInterval(() => clock.tick(11), 12);
+        setInterval(() => clock.tick(10), 11);
     
-        // Create 3 time more (+5) than allItemsPerSec queues and push a task to each one
-        const queueCount = limits.allItemsPerSec * 3 + 5;
-        const tasks = [...Array(queueCount)].map(async (_, i) => await task('test-' + i));
+        const queueCount = limits.allItemsPerSec * 2;
+        const tasksPerQue = 4;
+        const tasks = [...Array(tasksPerQue)].map(() => [...Array(queueCount)].map(async (_, i) => await task('test-' + i))).flat();
         
         // Wait until all tasks are resolved
         while (resolvedTasks < tasks.length)
@@ -117,6 +138,7 @@ describe('Scheduler', function () {
             seconds[secIdx]++;
         });
         
+        log('\n');
         seconds.forEach((tasksCompleted, i) => {
             log(`Second-${i}:`, tasksCompleted);
             expect(tasksCompleted).to.be.at.most(limits.allItemsPerSec);

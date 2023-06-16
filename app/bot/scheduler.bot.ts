@@ -27,11 +27,11 @@ export class Scheduler {
         const { promise, resolve } = this.createQuePromise<T>();
 
         que.push(() => task()
-            .then((out) => {
-                resolve({ ok: true, out })
-            })
+            .then((out) => resolve({ ok: true, out }))
             .catch((out) => {
-                log(`\nTask failed with error: ${out}`);
+                log(`\n[Task failed with] ${out}`);
+                if (env.isDev) debugger;
+
                 resolve({ ok: false, out: out || 'Task failed' });
             })
         );

@@ -5,7 +5,6 @@ import { time } from './time.utils';
 
 export const genFeed =
 ({
-    itemIds,
     lastChecked,
     checkFreq,
     feedItemPullCount,
@@ -13,7 +12,6 @@ export const genFeed =
     ...rest 
 }: FeedParams): Feed =>
 ({
-    itemIds: itemIds ?? [],
     lastChecked: lastChecked ?? 0,
     checkFreq: checkFreq ?? time.min(20),
     feedItemPullCount: feedItemPullCount ?? 20,
@@ -30,6 +28,7 @@ export const genChat =
     dayEndMsg,
     feedIds,
     timeZone,
+    idsOfSentFeedItems,
     ...rest
 }: ChatParams): Chat =>
 ({
@@ -39,6 +38,7 @@ export const genChat =
     dayStartMsg: dayStartMsg ?? null,
     dayEndMsg: dayEndMsg ?? null,
     feedIds: feedIds ?? [],
+    idsOfSentFeedItems: idsOfSentFeedItems ?? [],
     timeZone: timeZone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
     ...rest,
 });

@@ -1,3 +1,4 @@
+// main.ts //
 /**
  * !TODO:
  * - Ensure msg was delivered before storing the corresponding feed item
@@ -16,14 +17,17 @@ import { writeFile } from './utils/utils';
 import { botCmds } from './bot/commands.bot';
 import { chatDatStartEndDates, getTime, msToTime, time } from './utils/time.utils';
 import { filterFeedItems, filterFeeds, getFeed, storeFeedItems } from './feed';
+import { Bot } from './bot/bot';
 
-const params = {
+const params =
+{
     feedCheckFreq: time.min(1),
     maxJobUpdateAge: time.hrs(3),
 }
 
 // -- App Start -- //
-setTimeout(async () => {
+setTimeout(async () =>
+{
     try {
         // Write the commands to a file to share with "BotFather"
         writeFile('../bot-commands', Object.entries(botCmds).reduce((acc, [cmd, description]) => {
@@ -34,17 +38,18 @@ setTimeout(async () => {
         bot.start().then(() => log('[*] BOT INITIALIZED'));
         log('[1]: BOT STARTING...');
 
-        checkFeeds();
-        log('[2]: FEED CHECKER STARTED');
+        await updateMsgs();
+        log('[2]: MSG TIMES-UPDATER STARTED');
 
-        updateMsgs();
-        log('[3]: MSG TIMES-UPDATER STARTED');
+        checkFeeds();
+        log('[3]: FEED CHECKER STARTED');
 
         await import('./bot/commands.bot');
         log('[4]: COMMANDS INITIALIZED');
 
         const botInfo = await bot.getBotInfo();
-        chats.forEach((chat, chatId) => {
+        chats.forEach((chat, chatId) =>
+        {
             if (!chat.active || env.isDev) return;
 
             bot.sendMsg(chatId, '💻');
@@ -63,7 +68,7 @@ setTimeout(async () => {
 const jobIsTooOld = (job: FeedItem, noOlderThan: number) =>
     getTime(job.updated) < (Date.now() - noOlderThan);
 
-function checkFeeds()
+async function checkFeeds()
 {
     log(`Checking feeds...`);
 
@@ -72,13 +77,15 @@ function checkFeeds()
         .flat()
         .map(([feedId, feed]) => feedPullHandler(feedId, feed));
 
-    Promise.allSettled(promises).then(() => {
+    await Promise.allSettled(promises).then(() => {
         setTimeout(checkFeeds, params.feedCheckFreq);
+        chats.update(chats => chats);
         log(`Next check in: ${params.feedCheckFreq / time.min(1)} min`);
     });
 }
 
-async function feedPullHandler(feedId: string, feed: Feed) {
+async function feedPullHandler(feedId: string, feed: Feed)
+{
     const freq = feed.checkFreq;
     if (feed.lastChecked + freq > Date.now()) return;
     
@@ -92,19 +99,18 @@ async function feedPullHandler(feedId: string, feed: Feed) {
     }
     catch (error)
     {
-        log(error);
-        cleanStack(error);
+        log(cleanStack(error));
         if (env.isDev) debugger;
 
-        bot.sendMsg(chatId, `ERROR: fetching feed "${feed.name}"`);
         feeds.set(feedId, { ...feed, lastChecked: Date.now() });
+        bot.sendMsg(chatId, `ERROR: fetching feed "${feed.name}"`);
     }
 }
 
 
 async function feedUpdatesHandler(feedId: string, pulledFeedItems: FeedItem[])
 {
-    // store the feed items to json for later analytics
+    // store feedItems to json (for analytics) & `feedItems: MapState<string, FeedItem>`
     storeFeedItems(feedId, pulledFeedItems);
 
     const feed = feeds.get(feedId);
@@ -115,52 +121,59 @@ async function feedUpdatesHandler(feedId: string, pulledFeedItems: FeedItem[])
     
     const now = Date.now();
     const maxAge = feed.checkFreq * 3;
-    const maxAgeDate = now - maxAge;
-
-    const oldItems = filterFeedItems({ itemIds: feed.itemIds, maxAge: maxAgeDate });//(feeds[hashId]?.items || []).filter(x => !jobIsTooOld(x, freq * 2));
-    const items = new Map(oldItems);
-
+    
+    const sentItems = new Map(filterFeedItems({ itemIds: chat.idsOfSentFeedItems }));
     const newItems = pulledFeedItems
-        .filter(job => !jobIsTooOld(job, maxAge) && !items.has(job.linkHref))
-        .sort((a, b) => a.updated - b.updated);
+        .filter(job => !jobIsTooOld(job, maxAge) && !sentItems.has(job.linkHref))
+        .sort((a, b) => a.updated - b.updated); // sort oldest to newest
 
-    newItems.forEach(job => items.set(job.linkHref, job));
-    const itemIds = Array.from(items.keys());
+    // [feed Update] with last checked time
+    feeds.set(feedId, { ...feed, lastChecked: now });
 
-    // [feed] Update the feed with the new items, and the last checked time
-    feeds.set(feedId, { ...feed, itemIds, lastChecked: now });
-    
-    if (!newItems.length) return;
-
-    // if time now is outside the dayStart and dayEnd, don't send the message
+    // logic if to send msgs
     const { start, end } = chatDatStartEndDates(chat, now);
-    if (now > end.getTime() || now < start.getTime()) return;
-
-    // if first message of the day use all jobs from `items`
-    const isFirstMsgOfDay = now - feed.checkFreq < start.getTime();
-    const sendItemsIds = isFirstMsgOfDay ? Array.from(items.keys()) : newItems.map(({ linkHref }) => linkHref);
+    if (!newItems.length || now > end.getTime() || now < start.getTime()) return;
     
-    const { h, m } = msToTime(isFirstMsgOfDay ? maxAge : feed.checkFreq);
+    const isFirstMsgOfDay = now - feed.checkFreq <= start.getTime();
+    const { h, m } = msToTime(isFirstMsgOfDay ? maxAge : Date.now() - feed.lastChecked + feed.checkFreq);
     const { chatId } = feed;
 
     bot.sendMsg(chatId, '📨');
-    bot.sendMsg(chatId, `[📶]: ${feed.name}\n[📬]: ${sendItemsIds.length}\n[⏰]: ${h}h ${m}m`);
-    sendItemsIds.forEach(jobId => bot.sendJob(chatId, jobId));
+    const firstMsg = isFirstMsgOfDay ? "Starting your day with new opportunities for you to discover!\n\n" : '';
+    bot.sendMsg(chatId, firstMsg + `[📶]: ${feed.name}\n[📬]: ${newItems.length}\n[⏰]: ${h}h ${m}m`);
+    const promises = newItems.map(job => bot.sendJob(chatId, job.linkHref));
+
+    const res = await Promise.all(promises);
+    if (env.isDev && res.find(x => !x?.ok)) debugger;
+
+    res.forEach((val) =>
+    {
+        if (!val?.ok) return;
+        chat.idsOfSentFeedItems.push(val.out.jobMsg.feedItemId);
+    });
 }
 
 
-export function updateMsgs()
+export async function updateMsgs()
 {
     log('Updating messages...');
-    jobMsgs.forEach(({ feedItemId, date }, jobMsgId): any => {
-        const item = feedItems.has(feedItemId);
-        if (!item) {
+    const promises: ReturnType<Bot['updateJobMsg']>[] = [];
+    jobMsgs.forEach(({ feedItemId, date }, jobMsgId): any =>
+    {
+        if (!feedItems.has(feedItemId)) {
             console.log(`FeedItem not found: ${feedItemId}`);
             return jobMsgs.delete(jobMsgId);
         }
 
-        bot.updateJobMsg(jobMsgId, date + params.maxJobUpdateAge);
+        promises.push(
+            bot.updateJobMsg(jobMsgId, date + params.maxJobUpdateAge)
+        );
     });
 
-    setTimeout(updateMsgs, time.min(1.5));
+    await Promise.all(promises).then(() =>
+    {
+        jobMsgs.update(jobMsgs => jobMsgs);
+        setTimeout(updateMsgs, time.min(1.25));
+        // TODO: sent feed items
+    });
 }

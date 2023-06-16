@@ -1,3 +1,4 @@
+import { decode } from 'html-entities';
 import crypto from 'crypto';
 
 export function insertAt(str: string, index: number, insert: string) {
@@ -47,80 +48,18 @@ export function cleanUpContent(input: string, goDev = true)
     return replaceHtmlEntities(str);;
 }
 
-export const replaceHtmlEntities1 = (str: string) => {
-    let previous = '';
-    while (str !== previous) {
-        previous = str;
-        str = str.replace(entityRegex, match => {
-            if (!(htmlEntitiesMap as any)[match]) debugger;
+export const replaceHtmlEntities = (str: string) =>
+{
+    const entityRegex = /&[^;]+;/g;
+    let clean = str;
+    for (let i = 0; i < 3; i++)
+        if (entityRegex.test(clean))
+            clean = decode(clean)
+        else
+            return clean;
 
-            return (htmlEntitiesMap as any)[match] || match
-        });
-    }
-    return str;
+    if (env.isDev) debugger;
+    log('Failed to replace all HTML entities in string: ' + str)
+    return clean;
 };
 
-export const replaceHtmlEntities = (str: string) => {
-    while (entityRegex.test(str)) {
-        str = str.replace(entityRegex, match => {
-            if (!(htmlEntitiesMap as any)[match]) debugger;
-            return (htmlEntitiesMap as any)[match] || match
-        });
-    }
-
-    return str;
-};
-
-    
-
-const entityRegex = /&[^;]+;/g;
-
-const htmlEntitiesMap = {
-    "&amp;": "&",
-    "&apm;": "&",
-    "&lt;": "<",
-    "&gt;": ">",
-    "&apos;": "'",
-    "&#039;": "'",
-    "&quot;": '"',
-    "&nbsp;": " ",
-    "&copy;": "©",
-    "&uuml;": "ü",
-    "&Uuml;": "Ü",
-    "&ndash;": "—",
-    "&mdash;": "—",
-    "&iexcl;": "¡",
-    "&iquest;": "¿",
-    "&ldquo;": "“",
-    "&rdquo;": "”",
-    "&lsquo;": "‘",
-    "&rsquo;": "’",
-    "&laquo;": "«",
-    "&raquo;": "»",
-    "&bull;": "•",
-    "&hellip;": "…",
-    "&permil;": "‰",
-    "&prime;": "′",
-    "&Prime;": "″",
-    "&lsaquo;": "‹",
-    "&rsaquo;": "›",
-    "&oline;": "‾",
-    "&frasl;": "/",
-    "&euro;": "€",
-    "&trade;": "™",
-    "&larr;": "←",
-    "&uarr;": "↑",
-    "&rarr;": "→",
-    "&darr;": "↓",
-    "&harr;": "↔",
-    "&crarr;": "↵",
-    "&lceil;": "⌈",
-    "&rceil;": "⌉",
-    "&lfloor;": "⌊",
-    "&rfloor;": "⌋",
-    "&loz;": "◊",
-    "&clubs;": "♣",
-    "&hearts;": "♥",
-    "&diams;": "♦",
-    "&spades;": "♠",
-};

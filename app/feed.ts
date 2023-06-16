@@ -168,6 +168,11 @@ type FeedItemFilters = {
 };
 export function filterFeedItems(filters: FeedItemFilters)
 {
+    // check if the keys are set to undefined
+    if (env.isDev) Object.keys(filters).forEach((key) => {
+        if (Object.hasOwn(filters, key) && !filters[key as keyof FeedItemFilters]) debugger;
+    });
+    
     const f = (s: string) => s.toLocaleLowerCase().trim();
     const { countries, categories, itemIds, maxAge: dtMax, minAge: dtMin } = filters;
     const maxAge = dtMax && getTime(dtMax);

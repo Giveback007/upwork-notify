@@ -1,6 +1,7 @@
+// .bot/bot.ts //
 import TelegramBot from 'node-telegram-bot-api';
 import { splitUpString } from '../utils/string.utils';
-import { feedItems, jobMsgs } from '../store/store';
+import { chats, feedItems, jobMsgs } from '../store/store';
 import { generateMessage } from '../utils/msg.utils';
 import { Scheduler } from './scheduler.bot';
 import { users } from '../store/store';
@@ -17,7 +18,11 @@ const toSplitMsgs = (msg: string) => msg.length > msgLimit ? addPartInfo(msg) : 
 
 // https://t.me/${env.BOT_USERNAME}
 export class Bot {
-    private scheduler = new Scheduler();
+    private scheduler = new Scheduler({
+        allItemsPerSec: 28,
+        queItemsPerMin: 18,
+        timingPerQue: 1200,
+    });
     private bot: TelegramBot;
     private _botInfo: TelegramBot.User | null = null;
     
@@ -86,7 +91,7 @@ export class Bot {
         }
     }
 
-    updateJobMsg = async (jobMsgId: string, lastMsgTime?: number) =>
+    updateJobMsg = async (jobMsgId: string, lastMsgTime: number) =>
     {
         const now = Date.now();
 
@@ -96,7 +101,8 @@ export class Bot {
         const feedItem = feedItems.get(jobMsg.feedItemId);
         if (!feedItem) return log(`Feed item not found: ${jobMsg.feedItemId}`);
 
-        const updateMsg = addEllipsis(generateMessage(feedItem));
+        const updateMsg = addEllipsis(generateMessage(feedItem, lastMsgTime));
+        if (updateMsg === jobMsg.msgText) return;
 
         return this.scheduler.toQue(jobMsg.chatId, () => this.bot.editMessageText(updateMsg, {
             chat_id: jobMsg.chatId,
@@ -104,6 +110,8 @@ export class Bot {
             disable_web_page_preview: true
         })).then(res => {
             if (res.ok && lastMsgTime && lastMsgTime < now) jobMsgs.delete(jobMsgId);
+            if (res.ok) jobMsg.msgText = updateMsg;
+
             return res;
         });
     }
@@ -118,22 +126,27 @@ export class Bot {
         const feedItem = feedItems.get(feedItemId);
         if (!feedItem) return log(`Feed item not found: ${feedItemId}`);
 
-        const msg = addEllipsis(generateMessage(feedItem));
-        const res = await this.sendMsg(chatId, msg);
+        const chat = chats.get(chatId);
+        if (!chat) return log(`Chat not found: ${chatId}`);
+        
+        const msgTxt = addEllipsis(generateMessage(feedItem));
+        const res = await this.sendMsg(chatId, msgTxt);
         
         if (res.ok) {
             const jobMsgId = this.genMsgId(chatId, feedItemId);
-            // we should only have one message
-            const out = res.val[0]!;
-
-            jobMsgs.set(jobMsgId, {
+            // we should only have one message (bcs of addEllipsis())
+            const msg = res.val[0]!;
+            const jobMsg: JobMsg = {
                 chatId,
-                msgId: out.message_id,
-                date: out.date * 1000,
+                msgId: msg.message_id,
+                date: msg.date * 1000,
                 feedItemId,
-            });
+                msgText: msg.text || '',
+            }
 
-            return { ok: true, out } as const;
+            jobMsgs.set(jobMsgId, jobMsg);
+
+            return { ok: true, out: { jobMsg, msg } } as const;
         } else {
             return { ok: false, out: res.err! } as const;
         }

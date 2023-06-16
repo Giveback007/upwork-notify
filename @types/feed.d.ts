@@ -14,7 +14,6 @@ type FeedParams = {
     feedItemPullCount?: 10 | 20 | 50 | 100;
 
     checkFreq?: number;
-    itemIds?: string[];
     lastChecked?: number;
 };
 
