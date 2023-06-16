@@ -4,6 +4,7 @@ import { feedItems, jobMsgs } from '../store/store';
 import { generateMessage } from '../utils/msg.utils';
 import { Scheduler } from './scheduler.bot';
 import { users } from '../store/store';
+import { wait } from '../utils/time.utils';
 
 const msgLimit = 4096;
 
@@ -18,6 +19,7 @@ const toSplitMsgs = (msg: string) => msg.length > msgLimit ? addPartInfo(msg) : 
 export class Bot {
     private scheduler = new Scheduler();
     private bot: TelegramBot;
+    private _botInfo: TelegramBot.User | null = null;
     
     get username() {
         return this._botUsername;
@@ -29,6 +31,7 @@ export class Bot {
         private _botUsername: string,
     ) {
         this.bot = new TelegramBot(apiKey);
+        this.bot.getMe().then(info => this._botInfo = info);
 
         if (this._botUsername[0] !== '@')
             this._botUsername = '@' + this._botUsername;
@@ -39,6 +42,11 @@ export class Bot {
 
     getBot() {
         return this.bot;
+    }
+
+    async getBotInfo() {
+        while (!this._botInfo) await wait(100);
+        return this._botInfo;
     }
 
     /**
@@ -55,8 +63,10 @@ export class Bot {
         const result = await Promise.all(promises);
         const allOk = result.every(({ ok }) => ok);
 
-        if (!allOk)
+        if (!allOk) {
+            if (env.isDev) debugger;
             console.log('failed', result);
+        }
 
         const val = (result.filter(({ ok }) => ok) as {
             ok: true;
@@ -109,7 +119,7 @@ export class Bot {
         if (!feedItem) return log(`Feed item not found: ${feedItemId}`);
 
         const msg = addEllipsis(generateMessage(feedItem));
-        const res = await this.sendMsg(msg, chatId);
+        const res = await this.sendMsg(chatId, msg);
         
         if (res.ok) {
             const jobMsgId = this.genMsgId(chatId, feedItemId);

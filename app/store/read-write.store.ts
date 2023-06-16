@@ -28,9 +28,9 @@ export function writeState(update: Partial<AppState>) {
         const val: any = update[key];
 
         if (val instanceof UserState)
-            writtenState[key] = val.entries() as any;
+            writtenState[key] = val.entriesArr() as any;
         else if (val instanceof MapState)
-            writtenState[key] = val.entries() as any;
+            writtenState[key] = val.entriesArr() as any;
         else if (val instanceof State)
             writtenState[key] = val.get() as any;
         else

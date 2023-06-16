@@ -48,7 +48,7 @@ export function ageOfPost(item: FeedItem) {
     const {d, h, m} = msToTime(ageMs);
 
     let str;
-    if (time.hrs(h) >= time.hrs(2)) {
+    if (time.hrs(h) >= time.hrs(3)) {
         str = `(Stopped updating) Older than ${h} hours`;
     } else {
         str = `${h}h ${m}m`;

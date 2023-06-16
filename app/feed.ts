@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import * as xml2js from 'xml2js';
 import { handleZod, idsToRecord, readJSON, writeJSON } from "./utils/utils";
-import { hashString, replaceHtmlEntities, splitAt } from "./utils/string.utils";
+import { cleanUpContent, hashString, splitAt } from "./utils/string.utils";
 import { atomFeedToJSONSchema } from "./schemas/atom-to-json.schema";
 import { feedItemSchema } from "./schemas/feed-item.schema";
 import { isType } from "./utils/test.utils";
@@ -13,7 +13,10 @@ export function storeFeedItems(feedId: string, newFeedItems: FeedItem[])
     const filePath = `../data/feeds/${feedId}.json`;
 
     const oldItems = readJSON<Record<string, FeedItem>>(filePath) || {};
-    newFeedItems.forEach((item) => oldItems[item.linkHref] = item);
+    newFeedItems.forEach((item) => {
+        oldItems[item.linkHref] = item;
+        feedItems.set(item.linkHref, item);
+    });
 
     writeJSON(filePath, oldItems);
 }
@@ -106,18 +109,6 @@ export async function xmlToJSON(xml: string)
     return items;
 }
 
-export function cleanUpContent(input: string)
-{
-    const str = input
-        .replace(/<br\s*\/?>/g, '\n')
-        .replace(/<[^>]*>/g, '')
-        .replace(/click to apply\s*$/, '')
-        .replace(/(\n{2,})/g, (match) => '\n'.repeat(match.length - 1))
-        .trim();
-
-    return replaceHtmlEntities(str);
-}
-
 export function parseContent(content: string)
 {
     const extras = {} as FeedItemExtras;
@@ -166,12 +157,21 @@ export function filterFeeds(filters: FeedFilters, getIds: boolean = false): [str
         filteredFeeds;
 }
 
-type FeedItemFilters = { countries?: string[], categories?: string[], itemIds?: string[], maxAge?: number | Date };
+type FeedItemFilters = {
+    countries?: string[],
+    categories?: string[],
+    itemIds?: string[],
+    /** No older than (item.updated > MaxAge) */
+    maxAge?: number | Date,
+    /** No younger than (item.updated < MinAge) */
+    minAge?: number | Date,
+};
 export function filterFeedItems(filters: FeedItemFilters)
 {
     const f = (s: string) => s.toLocaleLowerCase().trim();
-    const { countries, categories, itemIds, maxAge: dt } = filters;
-    const maxAge = isType(dt, 'Date') ? dt.getTime() : dt;
+    const { countries, categories, itemIds, maxAge: dtMax, minAge: dtMin } = filters;
+    const maxAge = dtMax && getTime(dtMax);
+    const minAge = dtMin && getTime(dtMin);
 
     const idRec = itemIds ? idsToRecord(itemIds) : null;
     const countryRec = countries ? idsToRecord(countries.map(f)) : null;
@@ -181,6 +181,7 @@ export function filterFeedItems(filters: FeedItemFilters)
     feedItems.forEach((item, id) => {
         if (idRec && !idRec[id])                            return;
         if (maxAge && item.updated < maxAge)                return;
+        if (minAge && item.updated > minAge)                return;
         if (categoryRec && !categoryRec[f(item.Category)])  return;
         if (countryRec  && !countryRec[f(item.Country)])    return;
     

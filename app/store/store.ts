@@ -4,6 +4,9 @@ import { Bot } from "../bot/bot";
 import { MapState } from "./map-state.store";
 import { State } from "./state.store";
 import { CronJob, CronTime } from "cron";
+import { UserState } from "./user-state.store";
+import { time } from "../utils/time.utils";
+import { filterFeedItems } from "../feed";
 
 // -/-/- // -- appState -- // -/-/- //
 const appState: AppState = readState();
@@ -18,9 +21,20 @@ export const {
 }: AppState = appState;
 
 // -/-/- // -- state change listeners -- // -/-/- //
-Object.keys(appState).forEach((key) => {
-    const item = (appState as any)[key];
-    if (item instanceof MapState || item instanceof State)
+(Object.keys(appState) as (keyof AppState)[]).forEach((key) => {
+    const item: any = appState[key];
+    if (key === 'feedItems') {
+        // filter out old feed items
+        feedItems.on('change', () => {
+            const now = Date.now();
+            const oldItems = filterFeedItems({ minAge: now - time.day(0.5) });
+            if (oldItems.length === feedItems.size) return;
+
+            oldItems.forEach(([id]) => feedItems.delete(id));
+        });
+    }
+
+    if (item instanceof UserState || item instanceof MapState || item instanceof State)
         item.on('change', () => writeState({ [key]: item }));
 });
 
@@ -62,7 +76,7 @@ function updateCronJobs(chatId: string, chat: Chat | null)
             const newCronJob = new CronJob(cronTime, () =>
             {
                 bot.sendMsg(chatId, '🌞');
-                if (dayStartMsg) bot.sendMsg(chatId, dayStartMsg);
+                bot.sendMsg(chatId, dayStartMsg || 'Good morning! (Messages are back on)');
             }, null, active, timeZone);
 
             chatCron.dayStart = newCronJob;
@@ -88,7 +102,7 @@ function updateCronJobs(chatId: string, chat: Chat | null)
             const newCronJob = new CronJob(cronTime, () =>
             {
                 bot.sendMsg(chatId, '🌛');
-                if (dayEndMsg) bot.sendMsg(chatId, dayEndMsg);
+                bot.sendMsg(chatId, dayEndMsg || 'Good night! (No more messages for today)');
             }, null, active, timeZone);
 
             chatCron.dayEnd = newCronJob;

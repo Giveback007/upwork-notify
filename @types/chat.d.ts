@@ -25,7 +25,6 @@ type User = {
 };
 
 type BotUser = {
-    name: string;
     username: string;
     token: string;
     env: 'dev' | 'prod';

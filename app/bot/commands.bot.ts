@@ -371,7 +371,10 @@ function urlsHandler(state: UrlListState): any
             const chatFeeds = filterFeeds({ chatId });
 
             if (chatFeeds.length === 0)
+            {
+                chatStates.delete(chatId);
                 return bot.sendMsg(chatId, `No URLs added yet.`);
+            }
 
             const msgText = chatFeeds
                 .map(([,feed], i) => `${i + 1}. ${feed.name}\nURL: ${feed.rssUrl}`)
@@ -394,7 +397,10 @@ function urlDeleteHandler(state: UrlDeleteState, text: string): any
             const feeds = filterFeeds({ chatId });
 
             if (feeds.length === 0)
+            {
+                chatStates.delete(chatId);
                 return bot.sendMsg(chatId, `No URLs added yet.`);
+            }
 
             state.feeds = feeds;
             state.step!++;
@@ -462,9 +468,7 @@ function urlAddHandler(state: UrlAddState, text: string): any
             
             break;
         case urlAddStep.NAME:
-            // const feedsData = feeds.get();
-            
-            const feed = Array.from(feeds).find(([,feed]) => feed.name === text);
+            const feed = feeds.entriesArr().find(([,{ name }]) => name === text);
             if (feed)
                 return bot.sendMsg(chatId, `Name "${text}" is already being used.\n\nPlease try again with a different name.`);
 
@@ -481,11 +485,18 @@ function urlAddHandler(state: UrlAddState, text: string): any
             const { data } = zOut;
             data.lastChecked = Date.now();
 
-            feeds.set(UUID(), genFeed(data));
+            const chat = chats.get(chatId);
+            if (!chat) return bot.sendMsg(chatId, `ERROR: Chat data not found.`);
+
+            const feedId = UUID();
+            chat.feedIds.push(feedId);
+            
+            feeds.set(feedId, genFeed(data));
+            chats.set(chatId, chat);
             
             // Confirmation message
-            bot.sendMsg(chatId, `Added [📶]:\nName: "${text}"\nURL: ${state.rssUrl}`);
-            return chatStates.delete(chatId);
+            chatStates.delete(chatId);
+            return bot.sendMsg(chatId, `Added [📶]:\nName: "${text}"\nURL: ${state.rssUrl}`);
         default: unhandledCommand(state, chatId);
             
     }
@@ -509,7 +520,7 @@ const vldtUser = (msg: Message) =>
     const { chat, from } = msg;
     const chatId = chat.id.toString();
 
-    if (!from)
+    if (!from || !from.username)
     {
         bot.sendMsg(chatId, "Can't get user info.");
         return null;
@@ -521,7 +532,7 @@ const vldtUser = (msg: Message) =>
         return null;
     }
 
-    const user = users.get(chatId)!;
+    const user = users.get(from.username)!;
     return { chatId, userId: from.id.toString(), isBot: from.is_bot, roles: user.roles };
 }
 
@@ -573,17 +584,18 @@ bot.getBot().onText(/\/add_user( .+)?/, (msg, match): any =>
 {
     const from = vldtUser(msg);
     if (!from || !from.roles.admin) return;
-    const newUser = (match?.[1]) ? (match[1]?.trim()) : null;
+    let username = (match?.[1]) ? (match[1]?.trim()) : undefined;
 
     // Check if a username was provided
-    if (!newUser) {
-        bot.sendMsg(from.chatId, `Username "${newUser}" is not valid`);
+    if (!username) {
+        bot.sendMsg(from.chatId, `Username "${username}" is not valid`);
     } else {
-        const user = users.get(newUser);
-        if (user) return bot.sendMsg(from.chatId, `Username "${newUser}" is already in use`);
+        const user = users.get(username);
+        if (user) return bot.sendMsg(from.chatId, `Username "${username}" is already added`);
+        if (!username.startsWith('@')) username = `@${username}`;
 
-        users.set(newUser, { isActive: true, roles: {}, username: newUser });
-        bot.sendMsg(from.chatId, `Username "${newUser}" has been added`);
+        users.set(username, { isActive: true, roles: {}, username });
+        bot.sendMsg(from.chatId, `Username "${username}" has been added`);
     }
 });
 
@@ -611,6 +623,7 @@ cmdRegx.forEach(({ cmd, regx }) =>
     bot.getBot().onText(new RegExp(regx, 'i'), (msg) =>
     {
         const from = vldtUser(msg);
+        log(`Command: '${cmd}'`, { auth: !!from,  from: msg.from?.username, msg: msg.text })
         if (!from) return;
 
         const { chatId } = from;

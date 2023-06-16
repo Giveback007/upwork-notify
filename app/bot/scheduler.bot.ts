@@ -31,7 +31,6 @@ export class Scheduler {
                 resolve({ ok: true, out })
             })
             .catch((out) => {
-                log(cleanStack());
                 log(`\nTask failed with error: ${out}`);
                 resolve({ ok: false, out: out || 'Task failed' });
             })

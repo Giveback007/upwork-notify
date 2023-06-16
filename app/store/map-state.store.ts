@@ -77,10 +77,39 @@ export class MapState<K extends string | number, V> extends EventEmitter {
         this.map.forEach(callbackfn, thisArg);
     }
 
+    find = (predicate: (value: V, key: K, map: Map<K, V>) => boolean): V | undefined => {
+        // bcs performance :)
+        let found: V | undefined = undefined;
+        try {
+            this.map.forEach((value, key, map) => {
+                if (predicate(value, key, map)) {
+                    found = value;
+                    throw 'found';
+                }
+            });
+        } catch {
+            return found;
+        }
+
+        return found;
+    }
+
+    findAll = (predicate: (value: V, key: K, map: Map<K, V>) => boolean): V[] => {
+        const found: V[] = [];
+        this.map.forEach((value, key, map) => {
+            if (predicate(value, key, map)) found.push(value);
+        });
+
+        return found;
+    }
+
     // Key & Value Methods
     keys = (): IterableIterator<K> => this.map.keys();
     values = (): IterableIterator<V> => this.map.values();
     entries = (): IterableIterator<[K, V]> => this.map.entries();
+
+    // Conversion Method
+    entriesArr = (): [K, V][] => Array.from(this.map);
 
     // Iteration Method for 'for...of' loops
     [Symbol.iterator] = (): IterableIterator<[K, V]> => this.map[Symbol.iterator]();

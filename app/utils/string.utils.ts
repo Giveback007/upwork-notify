@@ -34,8 +34,44 @@ export function hashString(input: string, type: HashType = 'sha256'): string {
     return hash.digest('hex');
 }
 
-export const replaceHtmlEntities = (str: string) =>
-    str.replace(entityRegex, match => (htmlEntitiesMap as any)[match] || match);
+export function cleanUpContent(input: string, goDev = true)
+{
+    const str = input
+        .replace(/<br\s*\/?>/g, '\n')
+        .replace(/<[^>]*>/g, '')
+        .replace(/click to apply\s*$/, '')
+        .replace(/(\n{2,})/g, (match) => '\n'.repeat(match.length - 1))
+        .trim();
+        
+
+    return replaceHtmlEntities(str);;
+}
+
+export const replaceHtmlEntities1 = (str: string) => {
+    let previous = '';
+    while (str !== previous) {
+        previous = str;
+        str = str.replace(entityRegex, match => {
+            if (!(htmlEntitiesMap as any)[match]) debugger;
+
+            return (htmlEntitiesMap as any)[match] || match
+        });
+    }
+    return str;
+};
+
+export const replaceHtmlEntities = (str: string) => {
+    while (entityRegex.test(str)) {
+        str = str.replace(entityRegex, match => {
+            if (!(htmlEntitiesMap as any)[match]) debugger;
+            return (htmlEntitiesMap as any)[match] || match
+        });
+    }
+
+    return str;
+};
+
+    
 
 const entityRegex = /&[^;]+;/g;
 
@@ -46,12 +82,12 @@ const htmlEntitiesMap = {
     "&gt;": ">",
     "&apos;": "'",
     "&#039;": "'",
-    "&quot;": "\"",
+    "&quot;": '"',
     "&nbsp;": " ",
     "&copy;": "©",
     "&uuml;": "ü",
     "&Uuml;": "Ü",
-    "&ndash;": "–",
+    "&ndash;": "—",
     "&mdash;": "—",
     "&iexcl;": "¡",
     "&iquest;": "¿",

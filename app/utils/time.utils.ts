@@ -77,6 +77,7 @@ export function chatDatStartEndDates(chat: Chat, now = Date.now()) {
 
     const end = new Date(now);
     end.setHours(dayEnd[0], dayEnd[1], 0, 0);
+    if (dayEnd[0] < dayStart[0]) end.setDate(end.getDate() + 1);
 
     return { start, end };
 }
