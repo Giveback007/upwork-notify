@@ -29,7 +29,8 @@ export class Scheduler {
         que.push(() => task()
             .then((out) => resolve({ ok: true, out }))
             .catch((out) => {
-                log(`\n[Task failed with] ${out}`);
+                logErr('Task:', task.toString());
+                logErr(`\n[Task failed with] ${out}`);
                 if (env.isDev) debugger;
 
                 resolve({ ok: false, out: out || 'Task failed' });

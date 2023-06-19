@@ -2,6 +2,16 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
+function dtToStr(dt = new Date()): `${string}:${string}:${string}:${string}`
+{
+    const h = String(dt.getHours()).padStart(2, '0');
+    const m = String(dt.getMinutes()).padStart(2, '0');
+    const s = String(dt.getSeconds()).padStart(2, '0');
+    const ms = String(dt.getMilliseconds()).padStart(3, '0');
+
+    return `[${h}:${m}:${s}:${ms}]:`;
+}
+
 {
     const mainDir = dirname(fileURLToPath(import.meta.url));
     const keyFile = join(mainDir, '../.key');
@@ -32,7 +42,22 @@ import { fileURLToPath } from 'url'
     const globals: Globals = {
         env: { ...o, isDev, bot },
         mainFileDirectory: mainDir,
-        log: console.log.bind(console),
+        log: (...args: any[]) => {
+            const t = !env.isDev ? dtToStr() : '';
+            console.log(t, ...args);
+        },
+        logErr: (...args: any[]) => {
+            const stackLines = new Error().stack!.split('\n');
+            const callerLine = stackLines[2] as string;
+            const callerLineParts = callerLine.split('(')[1]!.replace(')', '').split(':');
+            const callerFile = callerLineParts.slice(0, -2).join(':');//.replace(root, '');
+            const callerLineNum = callerLineParts[callerLineParts.length - 2];
+            const callerCharNum = callerLineParts[callerLineParts.length - 1];
+
+            if (!env.isDev) log(dtToStr());
+            console.log(`[${cyan}${callerFile}:${magenta}${callerLineNum}:${callerCharNum}${reset}]:`);
+            console.error(...args);
+        },
         logLine: (...args: any[]) => {
             const stackLines = new Error().stack!.split('\n');
             const callerLine = stackLines[2] as string;
@@ -50,8 +75,6 @@ import { fileURLToPath } from 'url'
             if (!stack) return 'No stack trace found.';
         
             let lines = stack.split('\n');
-            const idx = lines.findIndex(line => line.includes('at cleanStack'));
-            if (idx !== -1) lines[idx] = root;
 
             lines = lines.filter(line => line.includes(root) && !line.includes('/node_modules/'));
             return lines.join('\n');

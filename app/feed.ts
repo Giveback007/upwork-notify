@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import * as xml2js from 'xml2js';
-import { handleZod, idsToRecord, readJSON, writeJSON } from "./utils/utils";
-import { cleanUpContent, hashString, splitAt } from "./utils/string.utils";
+import { handleZod, idsToRecord, readJSON, writeFile, writeJSON } from "./utils/utils";
+import { cleanUpContent, hashString, replaceHtmlEntities, splitAt } from "./utils/string.utils";
 import { atomFeedToJSONSchema } from "./schemas/atom-to-json.schema";
 import { feedItemSchema } from "./schemas/feed-item.schema";
 import { isType } from "./utils/test.utils";
@@ -32,8 +32,9 @@ export async function getFeed(atomUrl: string, num: Feed['feedItemPullCount'] = 
     });
 
     //! if xml is cached, use it (for testing purposes)
-    if (env.isDev) {
-        log('DEV MODE: Using cached xml')
+    if (0 && env.isDev) {
+        debugger;
+        log('DEV MODE: Using cached xml');
         const cachedXML = readJSON<string>(xmlPath);
         if (cachedXML) return await xmlToJSON(cachedXML);
     }
@@ -42,17 +43,17 @@ export async function getFeed(atomUrl: string, num: Feed['feedItemPullCount'] = 
         const response = await fetch(atomUrl);
         const xml = await response.text();
         if (env.isDev)
-            writeJSON(xmlPath, xml);
+            writeFile(xmlPath, xml);
         
         const json = await xmlToJSON(xml);
         if (!json) {
-            log('Failed to parse get feed from link')
+            logErr('Failed to parse get feed from link')
             if (env.isDev) debugger;
         }
         
         return json;
     } catch (error) {
-        log(error);
+        logErr(error);
         if (env.isDev) debugger;
 
         return null;
@@ -89,7 +90,7 @@ export async function xmlToJSON(xml: string)
         const { content, extras } = parseContent(x.content);
 
         const item = {
-            title: x.title.replace(/ - Upwork$/, ''),
+            title: replaceHtmlEntities(x.title.replace(/ - Upwork$/, '')),
             updated: getTime(x.updated),
             linkHref: x.id,
             content,
@@ -99,7 +100,7 @@ export async function xmlToJSON(xml: string)
         const zOut = handleZod(feedItemSchema, item);
         if (zOut.type === 'ERROR' || zOut.type === 'ZOD_ERROR') {
             if (env.isDev) debugger;
-            log(zOut.error);
+            logErr(zOut.error);
             return;
         }
 
@@ -111,7 +112,7 @@ export async function xmlToJSON(xml: string)
 
 export function parseContent(content: string)
 {
-    const extras = {} as FeedItemExtras;
+    const extras = { Country: '???', Category: '???', "Posted On": '???' } as FeedItemExtras;
     const breakIdx = content.lastIndexOf('<br /><br /><b>');
     
     // Separate the main content from the rest
@@ -139,10 +140,10 @@ export function filterFeeds(filters: FeedFilters, getIds: true): string[];
 export function filterFeeds(filters: FeedFilters, getIds: boolean = false): [string, Feed][] | string[]
 {
     const { userId, chatId, feedIds } = filters;
-    const filteredFeeds: [string, Required<FeedParams>][] = [];
     const idRec = feedIds ? idsToRecord(feedIds) : null;
-
+    
     let idx = 0;
+    const filteredFeeds: [string, Required<FeedParams>][] = [];
     feeds.forEach((feed, id) => {
         if (idRec && !idRec[id]) return;
         if (userId && feed.userId !== userId) return;
@@ -183,6 +184,7 @@ export function filterFeedItems(filters: FeedItemFilters)
     const countryRec = countries ? idsToRecord(countries.map(f)) : null;
     const categoryRec = categories ? idsToRecord(categories.map(f)) : null;
 
+    let idx = 0;
     const filteredFeedItem: [string, FeedItem][] = [];
     feedItems.forEach((item, id) => {
         if (idRec && !idRec[id])                            return;
@@ -191,7 +193,8 @@ export function filterFeedItems(filters: FeedItemFilters)
         if (categoryRec && !categoryRec[f(item.Category)])  return;
         if (countryRec  && !countryRec[f(item.Country)])    return;
     
-        filteredFeedItem.push([id, item]);
+        filteredFeedItem[idx] = [id, item];
+        idx++;
     });
 
     return filteredFeedItem;

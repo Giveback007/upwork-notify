@@ -52,14 +52,14 @@ export const replaceHtmlEntities = (str: string) =>
 {
     const entityRegex = /&[^;]+;/g;
     let clean = str;
-    for (let i = 0; i < 3; i++)
+    for (let i = 0; i < 4; i++)
         if (entityRegex.test(clean))
             clean = decode(clean)
         else
             return clean;
 
     if (env.isDev) debugger;
-    log('Failed to replace all HTML entities in string: ' + str)
+    logErr('Failed to replace all HTML entities in string: ' + str)
     return clean;
 };
 

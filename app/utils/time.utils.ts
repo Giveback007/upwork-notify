@@ -1,3 +1,5 @@
+import { Temporal } from '@js-temporal/polyfill';
+
 export function toStrHhMm(time: [number, number])
 {
     const hour = time[0].toString().padStart(2, '0');
@@ -68,16 +70,16 @@ export const time =
 export const wait = (ms: number) =>
     new Promise(r => setTimeout(r, ms));
 
-export function chatDatStartEndDates(chat: Chat, now = Date.now()) {
-    const dayStart = chat.dayStart || [7, 0];
-    const dayEnd = chat.dayEnd || [22, 0];
+export function chatDatStartEndDates(chat: Chat) {
+    const { timeZone, dayStart, dayEnd } = chat;
+    const timeInChat = Temporal.Now.zonedDateTimeISO(timeZone);
+    const msOffset = timeInChat.offsetNanoseconds / 1_000_000;
 
-    const start = new Date(now);
-    start.setHours(dayStart[0], dayStart[1], 0, 0);
+    const tStart = timeInChat.with({ hour: dayStart[0], minute: dayStart[1] });
+    let tEnd = timeInChat.with({ hour: dayEnd[0], minute: dayEnd[1] });
 
-    const end = new Date(now);
-    end.setHours(dayEnd[0], dayEnd[1], 0, 0);
-    if (dayEnd[0] < dayStart[0]) end.setDate(end.getDate() + 1);
-
-    return { start, end };
+    const start = tStart.epochMilliseconds;
+    const end = tEnd.epochMilliseconds;
+    
+    return { start, end: end < start ? end + time.day(1) : end, msOffset };
 }

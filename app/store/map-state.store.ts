@@ -120,7 +120,7 @@ export class MapState<K extends string | number, V> extends EventEmitter {
     // @ts-ignore
     override on = (event: "change", listener: (changeHistory: MapStateActions<K, V>[]) => void) => {
         if (event !== "change")
-            log(new Error(`Unsupported event type: ${event}`));
+            logErr(new Error(`Unsupported event type: ${event}`));
         else
             // @ts-ignore
             super.on(event, listener);

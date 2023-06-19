@@ -34,7 +34,8 @@ export class Bot {
         apiKey: string,
         /** Make sure to provide the full username with the "@" at the beginning */
         private _botUsername: string,
-    ) {
+    )
+    {
         this.bot = new TelegramBot(apiKey);
         this.bot.getMe().then(info => this._botInfo = info);
 
@@ -45,11 +46,13 @@ export class Bot {
     start = () => this.bot.startPolling();
     stop = () => this.bot.stopPolling();
 
-    getBot() {
+    getBot()
+    {
         return this.bot;
     }
 
-    async getBotInfo() {
+    async getBotInfo()
+    {
         while (!this._botInfo) await wait(100);
         return this._botInfo;
     }
@@ -68,9 +71,10 @@ export class Bot {
         const result = await Promise.all(promises);
         const allOk = result.every(({ ok }) => ok);
 
-        if (!allOk) {
+        if (!allOk)
+        {
             if (env.isDev) debugger;
-            console.log('failed', result);
+            logErr('failed', result);
         }
 
         const val = (result.filter(({ ok }) => ok) as {
@@ -96,10 +100,10 @@ export class Bot {
         const now = Date.now();
 
         const jobMsg = jobMsgs.get(jobMsgId);
-        if (!jobMsg) return log(`No message found with id ${jobMsgId}`);
+        if (!jobMsg) return logErr(`No message found with id ${jobMsgId}`);
 
         const feedItem = feedItems.get(jobMsg.feedItemId);
-        if (!feedItem) return log(`Feed item not found: ${jobMsg.feedItemId}`);
+        if (!feedItem) return logErr(`Feed item not found: ${jobMsg.feedItemId}`);
 
         const updateMsg = addEllipsis(generateMessage(feedItem, lastMsgTime));
         if (updateMsg === jobMsg.msgText) return;
@@ -109,8 +113,8 @@ export class Bot {
             message_id: Number(jobMsg.msgId),
             disable_web_page_preview: true
         })).then(res => {
-            if (res.ok && lastMsgTime && lastMsgTime < now) jobMsgs.delete(jobMsgId);
-            if (res.ok) jobMsg.msgText = updateMsg;
+            if (res.ok && lastMsgTime && lastMsgTime < now) this.deleteJobMsg(jobMsgId);
+            else if (res.ok) jobMsg.msgText = updateMsg;
 
             return res;
         });
@@ -124,10 +128,10 @@ export class Bot {
     sendJob = async (chatId: string, feedItemId: string) =>
     {
         const feedItem = feedItems.get(feedItemId);
-        if (!feedItem) return log(`Feed item not found: ${feedItemId}`);
+        if (!feedItem) return logErr(`Feed item not found: ${feedItemId}`);
 
         const chat = chats.get(chatId);
-        if (!chat) return log(`Chat not found: ${chatId}`);
+        if (!chat) return logErr(`Chat not found: ${chatId}`);
         
         const msgTxt = addEllipsis(generateMessage(feedItem));
         const res = await this.sendMsg(chatId, msgTxt);
@@ -150,6 +154,18 @@ export class Bot {
         } else {
             return { ok: false, out: res.err! } as const;
         }
+    }
+
+    deleteJobMsg = async (jobMsgId: string) =>
+    {
+        const jobMsg = jobMsgs.get(jobMsgId);
+        if (!jobMsg) return logErr(`Job message not found: ${jobMsgId}`);
+        const { chatId, msgId } = jobMsg;
+
+        const res = await this.scheduler.toQue(chatId, () => this.bot.deleteMessage(chatId, Number(msgId)));
+        jobMsgs.delete(jobMsgId);
+
+        return res;
     }
 
     genMsgId = (chatId: string | number, msgId: string | number) => `${chatId}-${msgId}`;

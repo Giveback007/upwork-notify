@@ -4,7 +4,7 @@ import { feedItemParamsSchema } from "../schemas/feed-item-params.schema";
 import TelegramBot, { Message } from "node-telegram-bot-api";
 import { filterFeeds } from "../feed";
 import { randomUUID as UUID } from 'crypto';
-import { find } from 'geo-tz';
+import { find as findTz } from 'geo-tz';
 import { msToTime, parseHhMm, time, toStrHhMm } from "../utils/time.utils";
 
 // --- // ChatStates Types // --- //
@@ -198,7 +198,7 @@ function chatStateHandler(state: ChatStates, msg: TelegramBot.Message): any
             // this should never happen
             const errMsg = `ERROR: Unhandled ChatState type: ${(state as any).type}`;
             bot.sendMsg(chatId, errMsg);
-            log(new Error(errMsg));
+            logErr(new Error(errMsg));
             if (env.isDev) debugger;
     }
 }
@@ -308,8 +308,7 @@ function setDayEndHandler(state: SetDayEndState, text: string): any
             const chat = chats.get(chatId);
             if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
 
-            chat.dayEnd = time;
-            chats.set(chatId, chat);
+            chats.set(chatId, { ...chat, dayEnd: time });
 
             chatStates.delete(chatId);
             return bot.sendMsg(chatId, `Your "day end" time is now set to ${toStrHhMm(time)}`);
@@ -336,8 +335,7 @@ function setDayStartHandler(state: SetDayStartState, text: string): any
             const chat = chats.get(chatId);
             if (!chat) return bot.sendMsg(chatId, 'ERROR: Unexpected Error: "Chat not found"');
 
-            chat.dayStart = time;
-            chats.set(chatId, chat);
+            chats.set(chatId, { ...chat, dayStart: time });
 
             chatStates.delete(chatId);
             return bot.sendMsg(chatId, `Your "day start" is set to: "${toStrHhMm(time)}"`);
@@ -356,7 +354,7 @@ function setTimeZoneHandler(state: TimeZoneState, msg: TelegramBot.Message): any
         case timeZoneStep.TIMEZONE:
             if (!msg.location) return bot.sendMsg(chatId, 'Could not get your location.\nPlease share your location');
             const [lat, lon] = [msg.location.latitude, msg.location.longitude];
-            const [timeZone] = find(lat, lon);
+            const [timeZone] = findTz(lat, lon);
 
             if (!timeZone)
                 return bot.sendMsg(chatId, 'Could not get your timezone.\nPlease try again.');
@@ -515,8 +513,8 @@ function unhandledCommand(state: ChatStates, chatId: string): any
     // this should never happen
     const errMsg = `Unhandled ChatState: ${(state as any).step}`;
     bot.sendMsg(chatId, errMsg);
-    log(new Error(errMsg));
-    log(state);
+    logErr(new Error(errMsg));
+    logErr(state);
     if (env.isDev) debugger;
 }
 
@@ -554,7 +552,7 @@ bot.getBot().onText(new RegExp(`^/start(${bot.username})?$`, 'i'), (msg) =>
     {
         chats.set(from.chatId, genChat({ type, active: true }));
         bot.sendMsg(from.chatId, `Welcome! I am ready to find jobs for you!\n`
-            + `\n  - Share your location to set your timezone.\n  - Use /add_url to add a new feed.`);
+            + `\n  - Share your location to set your timezone.\n  - Use /url_add to add a new feed.`);
     }
     else
     {

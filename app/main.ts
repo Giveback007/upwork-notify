@@ -15,13 +15,14 @@ import './init';
 import { bot, chats, feeds, jobMsgs, feedItems } from './store/store';
 import { writeFile } from './utils/utils';
 import { botCmds } from './bot/commands.bot';
-import { chatDatStartEndDates, getTime, msToTime, time } from './utils/time.utils';
+import { chatDatStartEndDates, getTime, msToTime, time, wait } from './utils/time.utils';
 import { filterFeedItems, filterFeeds, getFeed, storeFeedItems } from './feed';
 import { Bot } from './bot/bot';
 
 const params =
 {
-    feedCheckFreq: time.min(1),
+    feedCheckInterval: time.min(1),
+    feedCheckFreq: time.min(env.isDev ? 1 : 5),
     maxJobUpdateAge: time.hrs(3),
 }
 
@@ -38,7 +39,7 @@ setTimeout(async () =>
         bot.start().then(() => log('[*] BOT INITIALIZED'));
         log('[1]: BOT STARTING...');
 
-        await updateMsgs();
+        wait(time.min(1)).then(() => updateMsgs());
         log('[2]: MSG TIMES-UPDATER STARTED');
 
         checkFeeds();
@@ -59,7 +60,7 @@ setTimeout(async () =>
 
         log('[Final]: APP INITIALIZED');
     } catch(error) {
-        log(error);
+        logErr(error);
         if (env.isDev) debugger;
     }
 });
@@ -70,25 +71,25 @@ const jobIsTooOld = (job: FeedItem, noOlderThan: number) =>
 
 async function checkFeeds()
 {
+    const now = Date.now();
     log(`Checking feeds...`);
 
     const promises = Array.from(chats.values())
         .map((chat) => chat.active ? filterFeeds({ feedIds: chat.feedIds }) : [])
         .flat()
+        .filter(([,feed]) => feed.lastChecked + params.feedCheckFreq < now)
         .map(([feedId, feed]) => feedPullHandler(feedId, feed));
 
     await Promise.allSettled(promises).then(() => {
-        setTimeout(checkFeeds, params.feedCheckFreq);
+        setTimeout(checkFeeds, params.feedCheckInterval);
         chats.update(chats => chats);
-        log(`Next check in: ${params.feedCheckFreq / time.min(1)} min`);
+        log(`Next check in: ${params.feedCheckInterval / time.min(1)} min`);
     });
 }
 
 async function feedPullHandler(feedId: string, feed: Feed)
-{
-    const freq = feed.checkFreq;
-    if (feed.lastChecked + freq > Date.now()) return;
-    
+{   
+    log(`\n[${feedId}]: ${feed.name}`);
     const { feedItemPullCount, chatId } = feed;
     try
     {
@@ -99,7 +100,7 @@ async function feedPullHandler(feedId: string, feed: Feed)
     }
     catch (error)
     {
-        log(cleanStack(error));
+        logErr(error);
         if (env.isDev) debugger;
 
         feeds.set(feedId, { ...feed, lastChecked: Date.now() });
@@ -114,10 +115,10 @@ async function feedUpdatesHandler(feedId: string, pulledFeedItems: FeedItem[])
     storeFeedItems(feedId, pulledFeedItems);
 
     const feed = feeds.get(feedId);
-    if (!feed) return log(`Feed not found: ${feedId}`);
+    if (!feed) return logErr(`Feed not found: ${feedId}`);
 
     const chat = chats.get(feed.chatId);
-    if (!chat || !chat.active) return log(`Chat not available: ${feed.chatId}`);
+    if (!chat || !chat.active) return logErr(`Chat not available: ${feed.chatId}`);
     
     const now = Date.now();
     const maxAge = feed.checkFreq * 3;
@@ -131,11 +132,12 @@ async function feedUpdatesHandler(feedId: string, pulledFeedItems: FeedItem[])
     feeds.set(feedId, { ...feed, lastChecked: now });
 
     // logic if to send msgs
-    const { start, end } = chatDatStartEndDates(chat, now);
-    if (!newItems.length || now > end.getTime() || now < start.getTime()) return;
+    const { start, end } = chatDatStartEndDates(chat);
+    log(`\n${feed.chatId} [${feed.name}]: ${newItems.length} new items`);
+    if (!newItems.length || now > end || now < start) return log(`[Did not send msgs]`);
     
-    const isFirstMsgOfDay = now - feed.checkFreq <= start.getTime();
-    const { h, m } = msToTime(isFirstMsgOfDay ? maxAge : Date.now() - feed.lastChecked + feed.checkFreq);
+    const isFirstMsgOfDay = now - params.feedCheckFreq <= start;
+    const { h, m } = msToTime(isFirstMsgOfDay ? maxAge : Date.now() - feed.lastChecked + params.feedCheckFreq);
     const { chatId } = feed;
 
     bot.sendMsg(chatId, '📨');
@@ -144,8 +146,6 @@ async function feedUpdatesHandler(feedId: string, pulledFeedItems: FeedItem[])
     const promises = newItems.map(job => bot.sendJob(chatId, job.linkHref));
 
     const res = await Promise.all(promises);
-    if (env.isDev && res.find(x => !x?.ok)) debugger;
-
     res.forEach((val) =>
     {
         if (!val?.ok) return;
@@ -156,13 +156,15 @@ async function feedUpdatesHandler(feedId: string, pulledFeedItems: FeedItem[])
 
 export async function updateMsgs()
 {
+    if (env.isDev) return;
+
     log('Updating messages...');
-    const promises: ReturnType<Bot['updateJobMsg']>[] = [];
+    const promises: ReturnType<Bot['updateJobMsg'] | Bot['deleteJobMsg']>[] = [];
     jobMsgs.forEach(({ feedItemId, date }, jobMsgId): any =>
     {
         if (!feedItems.has(feedItemId)) {
-            console.log(`FeedItem not found: ${feedItemId}`);
-            return jobMsgs.delete(jobMsgId);
+            log(`FeedItem not found: ${feedItemId}`);
+            return promises.push(bot.deleteJobMsg(jobMsgId));
         }
 
         promises.push(

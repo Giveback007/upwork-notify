@@ -4,9 +4,9 @@ type ChatParams = {
     feedIds?: string[];
     idsOfSentFeedItems?: string[];
     /** [hour-24, mins-59] */
-    dayStart?: [number, number] | null;
+    dayStart?: [number, number];
     /** [hour-24, mins-59] */
-    dayEnd?: [number, number] | null;
+    dayEnd?: [number, number];
     dayStartMsg?: string | null;
     dayEndMsg?: string | null;
     timeZone?: string;

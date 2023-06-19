@@ -82,7 +82,6 @@ export const writeFile = (pth: string, data: string) =>
 
 export const readFile = (path: string) =>
 {
-    log('readFile', path);
     if (!fs.existsSync(joinMain(path))) return null;
     return fs.readFileSync(joinMain(path), 'utf8');
 }
@@ -92,7 +91,6 @@ export const readJSON = <T>(path: string): T | null =>
 
 export const writeJSON = (path: string, json: any) =>
 {
-    log('writeJSON', path);
     writeFile(path, JSON.stringify(json, null, 2));
 }
 

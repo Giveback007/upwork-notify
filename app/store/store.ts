@@ -35,13 +35,11 @@ export const bot = new Bot(env.bot.token, env.bot.username);
 // cron job for removing old feed items every hour
 new CronJob('0 * * * *', () => {
     /** No younger than (item.updated < MinAge) */
-    const oldItems = filterFeedItems({ minAge: Date.now() - time.day(0.5) });
+    const oldItems = filterFeedItems({ minAge: Date.now() - time.hrs(3) });
     if (oldItems.length === feedItems.size) return;
 
     oldItems.forEach(([id]) => feedItems.delete(id));
 }, null, true);
-
-
 
 type ChatCron = { dayStart?: CronJob; dayEnd?: CronJob; };
 const dayStartEndMsgs: { [chatId: string]: ChatCron } = {}
@@ -56,7 +54,10 @@ function updateCronJobs(chatId: string, chat: Chat | null)
         return;
     };
 
-    const { active, dayEnd, dayStart, dayEndMsg, dayStartMsg, timeZone } = chat;
+    const { 
+        active, dayEnd, dayStart,
+        dayEndMsg, dayStartMsg, timeZone 
+    } = chat;
 
     // If dayStart time is defined
     if (dayStart)
@@ -65,23 +66,13 @@ function updateCronJobs(chatId: string, chat: Chat | null)
         const cronTime = `${minute} ${hour} * * *`;
 
         if (chatCron.dayStart)
+            chatCron.dayStart.stop();
+        
+        chatCron.dayStart = new CronJob(cronTime, () =>
         {
-            const cronJob = chatCron.dayStart;
-            cronJob.setTime(new CronTime(cronTime, timeZone));
-
-            if (active) cronJob.start();
-            else cronJob.stop();
-        }
-        else
-        {
-            const newCronJob = new CronJob(cronTime, () =>
-            {
-                bot.sendMsg(chatId, '🌞');
-                bot.sendMsg(chatId, dayStartMsg || 'Good morning! (Messages are back on)');
-            }, null, active, timeZone);
-
-            chatCron.dayStart = newCronJob;
-        }
+            bot.sendMsg(chatId, '🌞');
+            bot.sendMsg(chatId, dayStartMsg || 'Good morning! (Messages are back on)');
+        }, null, active, timeZone);
     }
 
     // Similar for dayEnd
@@ -91,23 +82,13 @@ function updateCronJobs(chatId: string, chat: Chat | null)
         const cronTime = `${minute} ${hour} * * *`;
 
         if (chatCron.dayEnd)
+            chatCron.dayEnd.stop();
+        
+        chatCron.dayEnd = new CronJob(cronTime, () =>
         {
-            const cronJob = chatCron.dayEnd;
-            cronJob.setTime(new CronTime(cronTime, timeZone));
-
-            if (active) cronJob.start();
-            else cronJob.stop();
-        }
-        else
-        {
-            const newCronJob = new CronJob(cronTime, () =>
-            {
-                bot.sendMsg(chatId, '🌛');
-                bot.sendMsg(chatId, dayEndMsg || 'Good night! (No more messages for today)');
-            }, null, active, timeZone);
-
-            chatCron.dayEnd = newCronJob;
-        }
+            bot.sendMsg(chatId, '🌛');
+            bot.sendMsg(chatId, dayEndMsg || 'Good night! (No more messages for today)');
+        }, null, active, timeZone);
     }
 }
 

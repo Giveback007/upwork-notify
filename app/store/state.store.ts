@@ -22,7 +22,7 @@ export class State<T> extends EventEmitter {
     // @ts-ignore
     override on(event: "change", listener: (val: T) => any) {
         if (event !== "change")
-            log(new Error(`Unsupported event type: ${event}`));
+            logErr(new Error(`Unsupported event type: ${event}`));
         else 
             // @ts-ignore
             super.on(event, listener);
