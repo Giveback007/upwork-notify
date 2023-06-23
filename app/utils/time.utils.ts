@@ -91,13 +91,16 @@ export function chatStartEndDates(chat: Chat, now = Date.now())
 
     // log(timeZone, msOffset, -18000000 === msOffset);
     // log(new Date(now).toLocaleString('US-en', { timeZone }))
+
+    const chatTime = new Date(now).toLocaleString('US-en', { timeZone });
+    const serverTime = new Date(now).toLocaleDateString('US-en', { timeZone: 'UTC' });
     
     return start === end ?
     {
         start: null,
         end: null,
-        chatTime: new Date(now).toLocaleString('US-en', { timeZone }),
-        serverTime: new Date(now).toLocaleDateString('US-en', { timeZone: 'UTC' }),
+        chatTime,
+        serverTime,
         isDayEnd: false,
         disabled: true as const,
     }
@@ -105,6 +108,8 @@ export function chatStartEndDates(chat: Chat, now = Date.now())
     {
         start,
         end,
+        chatTime,
+        serverTime,
         isDayEnd,
         disabled: false as const,
     };
