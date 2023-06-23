@@ -29,8 +29,6 @@
     ]
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.4.4",
-    "cron": "^2.3.1",
     "geo-tz": "^7.0.7",
     "html-entities": "^2.3.6",
     "node-fetch": "^3.3.1",

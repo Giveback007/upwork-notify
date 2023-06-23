@@ -51,7 +51,7 @@ export function writeState(update: Partial<AppState>) {
 export function readState(): AppState {
     const { stateVersion, statePath } = stateParams;
 
-    const ws = readJSON<WrittenState>(statePath);
+    const ws = readJSON<WrittenState>(env.isDev ? `../data/dev-state-v4.json` : statePath);
     const useWS = ws && ws._v === stateVersion;
     
     const appState: AppState = {

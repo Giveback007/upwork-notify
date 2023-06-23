@@ -83,10 +83,10 @@ export class Bot {
         }[]).map(({ out }) => out);
 
         return allOk ? {
-            ok: true,
+            ok: true as const,
             val,
         } : {
-            ok: false,
+            ok: false as const,
             val,
             err: (result.filter(({ ok }) => !ok) as {
                 ok: false;
@@ -137,9 +137,8 @@ export class Bot {
         const res = await this.sendMsg(chatId, msgTxt);
         
         if (res.ok) {
-            const jobMsgId = this.genMsgId(chatId, feedItemId);
-            // we should only have one message (bcs of addEllipsis())
             const msg = res.val[0]!;
+            const jobMsgId = this.genMsgId(chatId, msg.message_id);
             const jobMsg: JobMsg = {
                 chatId,
                 msgId: msg.message_id,

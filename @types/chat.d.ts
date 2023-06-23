@@ -9,6 +9,7 @@ type ChatParams = {
     dayEnd?: [number, number];
     dayStartMsg?: string | null;
     dayEndMsg?: string | null;
+    lastDayStartEndMsg?: { start: number; end: number; };
     timeZone?: string;
     type: 'private' | 'group' | 'supergroup' | 'channel';
     /** A flag to indicate if the user /start or /stop the bot */

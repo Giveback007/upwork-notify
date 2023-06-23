@@ -1,5 +1,3 @@
-import { Temporal } from '@js-temporal/polyfill';
-
 export function toStrHhMm(time: [number, number])
 {
     const hour = time[0].toString().padStart(2, '0');
@@ -70,16 +68,57 @@ export const time =
 export const wait = (ms: number) =>
     new Promise(r => setTimeout(r, ms));
 
-export function chatDatStartEndDates(chat: Chat) {
-    const { timeZone, dayStart, dayEnd } = chat;
-    const timeInChat = Temporal.Now.zonedDateTimeISO(timeZone);
-    const msOffset = timeInChat.offsetNanoseconds / 1_000_000;
-
-    const tStart = timeInChat.with({ hour: dayStart[0], minute: dayStart[1] });
-    let tEnd = timeInChat.with({ hour: dayEnd[0], minute: dayEnd[1] });
-
-    const start = tStart.epochMilliseconds;
-    const end = tEnd.epochMilliseconds;
+export const getMsTzOffset = (timeZone: string, now = Date.now()) =>
+{
+    const str = new Date(now).toLocaleString('US-en', { timeZone });
+    const dtTz = new Date(str).getTime() - now;
     
-    return { start, end: end < start ? end + time.day(1) : end, msOffset };
+    return Number((dtTz / 60000).toFixed(0)) * 60000;
+}
+
+export function chatStartEndDates(chat: Chat, now = Date.now())
+{
+    const day = getUtcDayStartEnd(now);
+    const { timeZone, dayStart: startHhMm, dayEnd: endHhMm } = chat;
+    const msOffset = getMsTzOffset(timeZone, now);
+    const chatMsDayStart = day.start - msOffset;
+
+    const start = chatMsDayStart + time.hrs(startHhMm[0]) + time.min(startHhMm[1]);
+    let end = chatMsDayStart + time.hrs(endHhMm[0]) + time.min(endHhMm[1]);
+    end = end < start ? end + time.day(1) : end;
+    
+    const isDayEnd = now < start || end <= now;
+
+    // log(timeZone, msOffset, -18000000 === msOffset);
+    // log(new Date(now).toLocaleString('US-en', { timeZone }))
+    // log(new Date(end).toLocaleString('US-en', { timeZone }));
+    
+    return start === end ?
+    {
+        start: null,
+        end: null,
+        isDayEnd: false,
+        disabled: true as const,
+    }
+    :
+    {
+        start,
+        end,
+        isDayEnd,
+        disabled: false as const,
+    };
+}
+
+
+export function getUtcDayStartEnd(t: number, msOffset = 0) {
+    const dt = new Date(t);
+
+    const y = dt.getUTCFullYear();
+    const m = dt.getUTCMonth();
+    const d = dt.getUTCDate();
+    
+    return {
+        start: Date.UTC(y, m, d, 0, 0, 0, 0) - msOffset,
+        end: Date.UTC(y, m, d, 23, 59, 59, 999) - msOffset
+    };
 }

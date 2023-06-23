@@ -1,25 +1,12 @@
 import fetch from "node-fetch";
 import * as xml2js from 'xml2js';
-import { handleZod, idsToRecord, readJSON, writeFile, writeJSON } from "./utils/utils";
+import { handleZod, idsToRecord, readFile, writeFile } from "./utils/utils";
 import { cleanUpContent, hashString, replaceHtmlEntities, splitAt } from "./utils/string.utils";
 import { atomFeedToJSONSchema } from "./schemas/atom-to-json.schema";
 import { feedItemSchema } from "./schemas/feed-item.schema";
 import { isType } from "./utils/test.utils";
 import { feedItems, feeds } from "./store/store";
 import { getTime } from "./utils/time.utils";
-
-export function storeFeedItems(feedId: string, newFeedItems: FeedItem[])
-{
-    const filePath = `../data/feeds/${feedId}.json`;
-
-    const oldItems = readJSON<Record<string, FeedItem>>(filePath) || {};
-    newFeedItems.forEach((item) => {
-        oldItems[item.linkHref] = item;
-        feedItems.set(item.linkHref, item);
-    });
-
-    writeJSON(filePath, oldItems);
-}
 
 // https://www.upwork.com/ab/feed/jobs/atom?q=javascript&user_location_match=1&sort=recency&paging=0%3B10&api_params=1&securityToken=b8e9762da3383da88fdab543aaf25418ab321582509f154a4c322e49a5bc293e95645f9f157483f64618af05227ddb546a700cc96a3dae3177e3066c0c67d612&userUid=1057152582708793344&orgUid=1057152582717181953
 export async function getFeed(atomUrl: string, num: Feed['feedItemPullCount'] = 20)
@@ -32,10 +19,9 @@ export async function getFeed(atomUrl: string, num: Feed['feedItemPullCount'] = 
     });
 
     //! if xml is cached, use it (for testing purposes)
-    if (0 && env.isDev) {
-        debugger;
+    if (env.isDev) {
         log('DEV MODE: Using cached xml');
-        const cachedXML = readJSON<string>(xmlPath);
+        const cachedXML = readFile(xmlPath);
         if (cachedXML) return await xmlToJSON(cachedXML);
     }
 

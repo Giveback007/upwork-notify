@@ -1,5 +1,5 @@
 type ENV = {
-    env: 'dev' | 'prod';
+    env: 'dev' | 'prod' | 'test';
     bots: BotUser[];
     users: [string, User][];
 }

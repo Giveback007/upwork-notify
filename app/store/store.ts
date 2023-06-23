@@ -3,10 +3,10 @@ import { readState, writeState } from "./read-write.store";
 import { Bot } from "../bot/bot";
 import { MapState } from "./map-state.store";
 import { State } from "./state.store";
-import { CronJob, CronTime } from "cron";
 import { UserState } from "./user-state.store";
 import { time } from "../utils/time.utils";
 import { filterFeedItems } from "../feed";
+import { readJSON, writeJSON } from "../utils/utils";
 
 // -/-/- // -- appState -- // -/-/- //
 const appState: AppState = readState();
@@ -27,77 +27,40 @@ export const {
         item.on('change', () => writeState({ [key]: item }));
 });
 
+// -/-/- // -- clean up old data -- // -/-/- //
+(function cleanUpOld() {
+    if (env.env === 'test') return;
+    
+    feeds.forEach((fd, id) => !chats.has(fd.chatId) && feeds.delete(id));
+
+    const oldItems = filterFeedItems({ minAge: Date.now() - time.hrs(3) });
+    oldItems.forEach(([id]) => feedItems.delete(id));
+
+    chats.forEach((chat, id) => {
+        const set = new Set(chat.idsOfSentFeedItems);
+        set.forEach((id) => !feedItems.has(id) && set.delete(id));
+
+        chats.set(id, { ...chat, idsOfSentFeedItems: Array.from(set) });
+    });
+
+    jobMsgs.forEach((msg, id) => !chats.has(msg.chatId) && jobMsgs.delete(id));
+
+    setTimeout(cleanUpOld, time.min(30));
+})();
+
 // -/-/- // -- bot -- // -/-/- //
 export const bot = new Bot(env.bot.token, env.bot.username);
 
-// -/-/- // -- Cron Jobs -- // -/-/- //
 
-// cron job for removing old feed items every hour
-new CronJob('0 * * * *', () => {
-    /** No younger than (item.updated < MinAge) */
-    const oldItems = filterFeedItems({ minAge: Date.now() - time.hrs(3) });
-    if (oldItems.length === feedItems.size) return;
-
-    oldItems.forEach(([id]) => feedItems.delete(id));
-}, null, true);
-
-type ChatCron = { dayStart?: CronJob; dayEnd?: CronJob; };
-const dayStartEndMsgs: { [chatId: string]: ChatCron } = {}
-
-function updateCronJobs(chatId: string, chat: Chat | null)
+export function storeFeedItems(feedId: string, newFeedItems: FeedItem[])
 {
-    const chatCron: ChatCron = dayStartEndMsgs[chatId] = dayStartEndMsgs[chatId] || {};
-    if (!chat || !chat.active) {
-        chatCron.dayStart?.stop();
-        chatCron.dayEnd?.stop();
+    const filePath = `../data/feeds/${feedId}.json`;
 
-        return;
-    };
-
-    const { 
-        active, dayEnd, dayStart,
-        dayEndMsg, dayStartMsg, timeZone 
-    } = chat;
-
-    // If dayStart time is defined
-    if (dayStart)
-    {
-        const [hour, minute] = dayStart;
-        const cronTime = `${minute} ${hour} * * *`;
-
-        if (chatCron.dayStart)
-            chatCron.dayStart.stop();
-        
-        chatCron.dayStart = new CronJob(cronTime, () =>
-        {
-            bot.sendMsg(chatId, '🌞');
-            bot.sendMsg(chatId, dayStartMsg || 'Good morning! (Messages are back on)');
-        }, null, active, timeZone);
-    }
-
-    // Similar for dayEnd
-    if (dayEnd)
-    {
-        const [hour, minute] = dayEnd;
-        const cronTime = `${minute} ${hour} * * *`;
-
-        if (chatCron.dayEnd)
-            chatCron.dayEnd.stop();
-        
-        chatCron.dayEnd = new CronJob(cronTime, () =>
-        {
-            bot.sendMsg(chatId, '🌛');
-            bot.sendMsg(chatId, dayEndMsg || 'Good night! (No more messages for today)');
-        }, null, active, timeZone);
-    }
-}
-
-chats.forEach((chat, chatId) => updateCronJobs(chatId, chat));
-chats.on('change', () => {
-    Object.keys(dayStartEndMsgs).forEach((chatId) => {
-        if (chats.get(chatId)) return;
-        updateCronJobs(chatId, null);
+    const oldItems = readJSON<Record<string, FeedItem>>(filePath) || {};
+    newFeedItems.forEach((item) => {
+        oldItems[item.linkHref] = item;
+        feedItems.set(item.linkHref, item);
     });
 
-    chats.forEach((chat, chatId) => updateCronJobs(chatId, chat))
-});
+    writeJSON(filePath, oldItems);
+}

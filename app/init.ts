@@ -2,17 +2,20 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
-function dtToStr(dt = new Date()): `${string}:${string}:${string}:${string}`
 {
-    const h = String(dt.getHours()).padStart(2, '0');
-    const m = String(dt.getMinutes()).padStart(2, '0');
-    const s = String(dt.getSeconds()).padStart(2, '0');
-    const ms = String(dt.getMilliseconds()).padStart(3, '0');
+    // set the serve TZ to UTC
+    process.env.TZ = 'UTC';
+    
+    function dtToStr(dt = new Date()): `${string}:${string}:${string}:${string}`
+    {
+        const h = String(dt.getHours()).padStart(2, '0');
+        const m = String(dt.getMinutes()).padStart(2, '0');
+        const s = String(dt.getSeconds()).padStart(2, '0');
+        const ms = String(dt.getMilliseconds()).padStart(3, '0');
 
-    return `[${h}:${m}:${s}:${ms}]:`;
-}
+        return `[${h}:${m}:${s}:${ms}]:`;
+    }
 
-{
     const mainDir = dirname(fileURLToPath(import.meta.url));
     const keyFile = join(mainDir, '../.key');
     const key = readFileSync(keyFile, 'utf-8');
@@ -42,9 +45,8 @@ function dtToStr(dt = new Date()): `${string}:${string}:${string}:${string}`
     const globals: Globals = {
         env: { ...o, isDev, bot },
         mainFileDirectory: mainDir,
-        log: (...args: any[]) => {
-            const t = !env.isDev ? dtToStr() : '';
-            console.log(t, ...args);
+        log: isDev ? console.log : (...args: any[]) => {
+            console.log(dtToStr(), ...args);
         },
         logErr: (...args: any[]) => {
             const stackLines = new Error().stack!.split('\n');

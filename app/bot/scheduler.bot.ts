@@ -31,7 +31,7 @@ export class Scheduler {
             .catch((out) => {
                 logErr('Task:', task.toString());
                 logErr(`\n[Task failed with] ${out}`);
-                if (env.isDev) debugger;
+                // if (env.isDev) debugger;
 
                 resolve({ ok: false, out: out || 'Task failed' });
             })

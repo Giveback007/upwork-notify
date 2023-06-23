@@ -29,6 +29,7 @@ export const genChat =
     feedIds,
     timeZone,
     idsOfSentFeedItems,
+    lastDayStartEndMsg,
     ...rest
 }: ChatParams): Chat =>
 ({
@@ -40,6 +41,7 @@ export const genChat =
     feedIds: feedIds ?? [],
     idsOfSentFeedItems: idsOfSentFeedItems ?? [],
     timeZone: timeZone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone,
+    lastDayStartEndMsg: lastDayStartEndMsg ?? { start: 0, end: 0 },
     ...rest,
 });
 
@@ -87,7 +89,10 @@ export const readFile = (path: string) =>
 }
 
 export const readJSON = <T>(path: string): T | null =>
-    JSON.parse(readFile(path) || null as any);
+{
+    const result = readFile(path) || null as any;
+    return JSON.parse(result);
+};
 
 export const writeJSON = (path: string, json: any) =>
 {
