@@ -14,7 +14,9 @@
     "run-build": "node --experimental-specifier-resolution=node ./dist/main.js",
     "test": "tsx mocha.test.ts",
     "test:watch": "tsx watch mocha.test.ts",
-    "tsx-scrap": "tsx watch --inspect app/_scrap.ts"
+    "tsx-scrap": "tsx watch --inspect app/_scrap.ts",
+    "server:refresh": "git pull && pnpm serve",
+    "serve": "pnpm build && pnpm start:prod && pm2 logs"
   },
   "keywords": [],
   "author": "",

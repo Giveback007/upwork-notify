@@ -36,11 +36,18 @@ export const {
     const oldItems = filterFeedItems({ minAge: Date.now() - time.hrs(3) });
     oldItems.forEach(([id]) => feedItems.delete(id));
 
-    chats.forEach((chat, id) => {
-        const set = new Set(chat.idsOfSentFeedItems);
-        set.forEach((id) => !feedItems.has(id) && set.delete(id));
+    chats.forEach((chat, chatId) => {
+        const sentIds = new Set(chat.idsOfSentFeedItems);
+        sentIds.forEach(id => !feedItems.has(id) && sentIds.delete(id));
+        
+        const feedIds = new Set(chat.feedIds);
+        feedIds.forEach(id => !feeds.has(id) && feedIds.delete(id))
 
-        chats.set(id, { ...chat, idsOfSentFeedItems: Array.from(set) });
+        chats.set(chatId, {
+            ...chat,
+            idsOfSentFeedItems: Array.from(sentIds),
+            feedIds: Array.from(feedIds),
+        });
     });
 
     jobMsgs.forEach((msg, id) => !chats.has(msg.chatId) && jobMsgs.delete(id));

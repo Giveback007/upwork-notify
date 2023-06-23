@@ -16,6 +16,32 @@ import { fileURLToPath } from 'url'
         return `[${h}:${m}:${s}:${ms}]:`;
     }
 
+    function getCallerLine(): string | null
+    {
+        const errStack = new Error().stack?.split('\n') || [];
+        let errIdx = errStack.findIndex(line => line === 'Error');
+        if (errIdx > -1)
+            errIdx += 3;
+        else if (!errStack.length)
+            return null;
+
+        try
+        {
+            const callerLine = errStack[errIdx] as string;
+            const [file, line, col] = callerLine.split(/[(|)]/)[1]!.split(':');
+            
+            return `[${cyan}${file}:${magenta}${line}:${col}${reset}]:`;
+        }
+        catch(err)
+        {
+            console.log(err);
+            console.log(errStack);
+            console.log('Could not get caller line');
+
+            return null;
+        }
+    }
+
     const mainDir = dirname(fileURLToPath(import.meta.url));
     const keyFile = join(mainDir, '../.key');
     const key = readFileSync(keyFile, 'utf-8');
@@ -39,7 +65,7 @@ import { fileURLToPath } from 'url'
     // colors
     const cyan = '\x1b[36m';
     const magenta = '\x1b[35m';
-    const green = '\x1b[32m';
+    // const green = '\x1b[32m';
     const reset = '\x1b[0m';
 
     const globals: Globals = {
@@ -48,28 +74,19 @@ import { fileURLToPath } from 'url'
         log: isDev ? console.log : (...args: any[]) => {
             console.log(dtToStr(), ...args);
         },
-        logErr: (...args: any[]) => {
-            const stackLines = new Error().stack!.split('\n');
-            const callerLine = stackLines[2] as string;
-            const callerLineParts = callerLine.split('(')[1]!.replace(')', '').split(':');
-            const callerFile = callerLineParts.slice(0, -2).join(':');//.replace(root, '');
-            const callerLineNum = callerLineParts[callerLineParts.length - 2];
-            const callerCharNum = callerLineParts[callerLineParts.length - 1];
+        logErr: (err: any) => {
+            const caller = getCallerLine();
 
-            if (!env.isDev) log(dtToStr());
-            console.log(`[${cyan}${callerFile}:${magenta}${callerLineNum}:${callerCharNum}${reset}]:`);
-            console.error(...args);
+            if (!env.isDev) console.log(dtToStr());
+            if (caller) console.log(caller);
+
+            console.error(err);
         },
         logLine: (...args: any[]) => {
-            const stackLines = new Error().stack!.split('\n');
-            const callerLine = stackLines[2] as string;
-            const callerLineParts = callerLine.split('(')[1]!.replace(')', '').split(':');
-            const callerFile = callerLineParts.slice(0, -2).join(':');//.replace(root, '');
-            const callerLineNum = callerLineParts[callerLineParts.length - 2];
-            const callerCharNum = callerLineParts[callerLineParts.length - 1];
-        
-            console.log(`[${cyan}${callerFile}:${magenta}${callerLineNum}:${callerCharNum}${reset}]:`);
-            console.log(green, ...args, reset);
+            const caller = getCallerLine();
+            if (caller) console.log(caller);
+
+            console.log(...args);
         },
         cleanStack: (error = new Error()) => {
             if (!(error instanceof Error)) error = new Error(error);
@@ -91,7 +108,7 @@ import { fileURLToPath } from 'url'
         console.error('An uncaughtException was found, the program will end.');
         console.error(err.stack);
 
-        log(cleanStack(err));
+        if (err instanceof Error) cleanStack(err);
         if (env.isDev) debugger;
 
         process.exit(1);

@@ -13,7 +13,7 @@ import './init';
 import { bot, chats, feeds, jobMsgs, feedItems, storeFeedItems } from './store/store';
 import { writeFile } from './utils/utils';
 import { botCmds } from './bot/commands.bot';
-import { chatStartEndDates, getTime, msToTime, time, wait } from './utils/time.utils';
+import { chatTimeInfo, getTime, msToTime, time, wait } from './utils/time.utils';
 import { filterFeedItems, getFeed } from './feed';
 import { Bot } from './bot/bot';
 
@@ -49,7 +49,7 @@ setTimeout(async () =>
         const botInfo = await bot.getBotInfo();
         const proms = chats.entriesArr().map(async ([chatId, chat]) =>
         {
-            const { isDayEnd } = chatStartEndDates(chat);
+            const { isDayEnd } = chatTimeInfo(chat);
             if (!chat.active || isDayEnd || env.isDev) return;
 
             await bot.sendMsg(chatId, '💻');
@@ -78,7 +78,7 @@ async function checkFeeds()
     const doCheckFeed: { [feedId: string]: boolean | undefined } = {};
     chats.forEach((chat, chatId) =>
     {
-        const { isDayEnd } = chatStartEndDates(chat);
+        const { isDayEnd } = chatTimeInfo(chat);
         if (!chat.active || isDayEnd)
             return isDayEnd && log(`Chat: ${chatId} 'isDayEnd'`);
 
@@ -151,7 +151,7 @@ async function feedUpdatesHandler(feedId: string, pulledFeedItems: FeedItem[])
     log(`\n${feed.chatId} [${feed.name}]: ${newItems.length} new items`);
     if (!newItems.length) return;
     
-    const { start, disabled } = chatStartEndDates(chat);
+    const { start, disabled } = chatTimeInfo(chat);
     const isFirstMsgOfDay = !disabled && (now - params.feedCheckFreq <= start);
 
     const { h, m } = msToTime(now - prevLastChecked);
@@ -200,7 +200,7 @@ async function dayStartEndMsgs() {
     const promises = chats.entriesArr().map(async ([chatId, chat]) => {
         if (!chat.active) return;
         const { lastDayStartEndMsg: last = { start: 0, end: 0 } } = chat;
-        const { start, end, isDayEnd, disabled } = chatStartEndDates(chat);
+        const { start, end, isDayEnd, disabled } = chatTimeInfo(chat);
         if (disabled) return;
         
         if (isDayEnd && end > last.end)

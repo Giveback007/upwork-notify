@@ -2,8 +2,15 @@ export function toStrHhMm(time: [number, number])
 {
     const hour = time[0].toString().padStart(2, '0');
     const minute = time[1].toString().padStart(2, '0');
+    const tStr = hour + ':' + minute;
 
-    return hour + ':' + minute;
+    let tAmPm = '';
+    if (time[0] >= 12)
+        tAmPm = (time[0] - 12) + ':' + minute + ' PM';
+    else
+        tAmPm = tStr + ' AM';
+
+    return `${tStr} (${tAmPm})`;
 }
 
 export function parseHhMm(timeStr: string): [number, number] | null
@@ -76,10 +83,14 @@ export const getMsTzOffset = (timeZone: string, now = Date.now()) =>
     return Number((dtTz / 60000).toFixed(0)) * 60000;
 }
 
-export function chatStartEndDates(chat: Chat, now = Date.now())
+export function chatTimeInfo(chat: Chat, now = Date.now())
 {
-    const day = getUtcDayStartEnd(now);
     const { timeZone, dayStart: startHhMm, dayEnd: endHhMm } = chat;
+
+    // this is a hack, but it works well
+    const chatTime = new Date(now).toLocaleString('US-en', { timeZone });
+    const day = getUtcDayStartEnd(chatTime);
+    
     const msOffset = getMsTzOffset(timeZone, now);
     const chatMsDayStart = day.start - msOffset;
 
@@ -89,11 +100,12 @@ export function chatStartEndDates(chat: Chat, now = Date.now())
     
     const isDayEnd = now < start || end <= now;
 
-    // log(timeZone, msOffset, -18000000 === msOffset);
-    // log(new Date(now).toLocaleString('US-en', { timeZone }))
-
-    const chatTime = new Date(now).toLocaleString('US-en', { timeZone });
-    const serverTime = new Date(now).toLocaleDateString('US-en', { timeZone: 'UTC' });
+    // log(timeZone, msOffset);
+    // log('START:', new Date(start).toLocaleString('US-en', { timeZone }));
+    // log('END:', new Date(end).toLocaleString('US-en', { timeZone }));
+    // log('LOCAL:', chatTime);
+    
+    const serverTime = new Date(now).toLocaleString('US-en', { timeZone: 'UTC' });
     
     return start === end ?
     {
@@ -116,7 +128,7 @@ export function chatStartEndDates(chat: Chat, now = Date.now())
 }
 
 
-export function getUtcDayStartEnd(t: number, msOffset = 0) {
+export function getUtcDayStartEnd(t: number | string, msOffset = 0) {
     const dt = new Date(t);
 
     const y = dt.getUTCFullYear();
