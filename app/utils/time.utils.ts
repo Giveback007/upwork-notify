@@ -91,12 +91,13 @@ export function chatStartEndDates(chat: Chat, now = Date.now())
 
     // log(timeZone, msOffset, -18000000 === msOffset);
     // log(new Date(now).toLocaleString('US-en', { timeZone }))
-    // log(new Date(end).toLocaleString('US-en', { timeZone }));
     
     return start === end ?
     {
         start: null,
         end: null,
+        chatTime: new Date(now).toLocaleString('US-en', { timeZone }),
+        serverTime: new Date(now).toLocaleDateString('US-en', { timeZone: 'UTC' }),
         isDayEnd: false,
         disabled: true as const,
     }

@@ -5,7 +5,7 @@ import TelegramBot, { Message } from "node-telegram-bot-api";
 import { filterFeeds } from "../feed";
 import { randomUUID as UUID } from 'crypto';
 import { find as findTz } from 'geo-tz';
-import { msToTime, parseHhMm, time, toStrHhMm } from "../utils/time.utils";
+import { chatStartEndDates, msToTime, parseHhMm, time, toStrHhMm } from "../utils/time.utils";
 
 // --- // ChatStates Types // --- //
 type ChatStates =
@@ -265,6 +265,8 @@ function chatInfoHandler(state: ChatInfoState): any
             const dayEndStr = dayEnd ? `${toStrHhMm(dayEnd)}` : 'Not set';
             const dayStartMsg = chat.dayStartMsg || 'Not set';
             const dayEndMsg = chat.dayEndMsg || 'Not set';
+            const chatTime = chatStartEndDates(chat);
+
             const feedList = filterFeeds({feedIds}).map(([, feed], i) =>
             {
                 const { name, lastChecked } = feed;
@@ -279,7 +281,9 @@ function chatInfoHandler(state: ChatInfoState): any
                 + `\nDay End: ${dayEndStr}\n`
                 + `\nDay Start Msg: \n"${dayStartMsg}"\n`
                 + `\nDay End Msg: \n"${dayEndMsg}"\n`
-                + `\nFeeds:\n${feedList}`;
+                + `\nFeeds:\n${feedList}`
+                + `\n\nChat Time: ${chatTime.chatTime}`
+                + `\nServer Time: ${chatTime.serverTime}`;
             
 
             chatStates.delete(chatId);
